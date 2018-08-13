@@ -1,0 +1,19 @@
+apply plugin: 'java-library'
+apply plugin: "kotlin"
+
+targetCompatibility = JavaVersion.VERSION_1_8
+sourceCompatibility = JavaVersion.VERSION_1_8
+
+dependencies {
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
+    compileOnly "com.android.tools.lint:lint-api:$lint_version"
+    compileOnly "com.android.tools.lint:lint-checks:$lint_version"
+    testImplementation "com.android.tools.lint:lint:$lint_version"
+    testImplementation "com.android.tools.lint:lint-tests:$lint_version"
+}
+
+jar {
+    manifest {
+        attributes("Lint-Registry": "com.yy.mobile.whisperlint.WhisperRuleRegistry")
+    }
+}
