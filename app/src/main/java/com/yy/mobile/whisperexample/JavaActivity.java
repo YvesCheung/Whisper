@@ -15,6 +15,10 @@ public class JavaActivity extends AppCompatActivity {
 
         test1.myMethod();
 
-        test1.finalValue = 4;
+        int result = test1.methodV1(3, "oo");
+
+        test1.oldMethod(3, 4.0);
+
+        test1.methodWithInfo(23);
     }
 }

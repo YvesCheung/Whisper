@@ -7,7 +7,9 @@ import com.android.tools.lint.detector.api.Issue
 class WhisperRuleRegistry : IssueRegistry() {
 
     override val issues: List<Issue>
-        get() = listOf(*WhisperHintDetector.getIssue())
+        get() = listOf(
+            *WhisperHintDetector.getIssue(),
+            *WhisperDeprecatedDetector.getIssue())
 
     override val api: Int = CURRENT_API
 }

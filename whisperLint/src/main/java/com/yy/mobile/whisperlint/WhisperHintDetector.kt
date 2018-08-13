@@ -60,10 +60,9 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        private const val annoPkg = "com.yy.mobile.whisper"
-        private const val needWarningAnnotation = "$annoPkg.NeedWarning"
-        private const val needErrorAnnotation = "$annoPkg.NeedError"
-        private const val needInfoAnnotation = "$annoPkg.NeedInfo"
+        private const val needWarningAnnotation = "$AnnotationPkg.NeedWarning"
+        private const val needErrorAnnotation = "$AnnotationPkg.NeedError"
+        private const val needInfoAnnotation = "$AnnotationPkg.NeedInfo"
 
         fun getIssue() = arrayOf(
             ISSUE_WHISPER_WARNING,
@@ -95,14 +94,14 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
         allPackageAnnotations: List<UAnnotation>
     ) {
 
-        System.out.println("\nlocation = ${usage.getContainingUClass()?.qualifiedName}\n" +
-            "usage = $usage, type = $type,\n" +
-            "anno = $annotation, qualiName = $qualifiedName,\n" +
-            "method = $method,\n" +
-            "annos = $annotations,\n" +
-            "allMethodAnno = $allMemberAnnotations,\n" +
-            "allClassAnno = $allClassAnnotations,\n" +
-            "allPackAnno = $allPackageAnnotations")
+//        System.out.println("\nlocation = ${usage.getContainingUClass()?.qualifiedName}\n" +
+//            "usage = $usage, type = $type,\n" +
+//            "anno = $annotation, qualiName = $qualifiedName,\n" +
+//            "method = $method,\n" +
+//            "annos = $annotations,\n" +
+//            "allMethodAnno = $allMemberAnnotations,\n" +
+//            "allClassAnno = $allClassAnnotations,\n" +
+//            "allPackAnno = $allPackageAnnotations")
 
         val reportMsg = annotation.attributeValues.firstOrNull()?.expression?.evaluateString()
             ?: return
