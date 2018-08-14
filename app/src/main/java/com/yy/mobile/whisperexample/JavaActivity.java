@@ -17,7 +17,6 @@ public class JavaActivity extends AppCompatActivity {
 
         test1.oldMethod(3, 4.0);
 
-
         test2.myMethod();
 
         test2.methodWithInfo(23);

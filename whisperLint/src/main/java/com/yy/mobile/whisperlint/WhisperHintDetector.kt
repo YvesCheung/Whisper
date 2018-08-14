@@ -1,18 +1,22 @@
 package com.yy.mobile.whisperlint
 
+import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.AnnotationUsageType
 import com.android.tools.lint.detector.api.Category
+import com.android.tools.lint.detector.api.ConstantEvaluator
 import com.android.tools.lint.detector.api.Detector
 import com.android.tools.lint.detector.api.Implementation
 import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
+import com.intellij.psi.PsiAnnotation
+import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UElement
+import org.jetbrains.uast.USimpleNameReferenceExpression
 import org.jetbrains.uast.evaluateString
-import org.jetbrains.uast.getContainingUClass
 import java.util.*
 
 /**
@@ -73,9 +77,7 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
         return type == AnnotationUsageType.METHOD_CALL ||
             type == AnnotationUsageType.METHOD_CALL_PARAMETER ||
-            type == AnnotationUsageType.ANNOTATION_REFERENCE ||
-            type == AnnotationUsageType.ASSIGNMENT ||
-            type == AnnotationUsageType.VARIABLE_REFERENCE
+            type == AnnotationUsageType.ANNOTATION_REFERENCE
     }
 
     override fun applicableAnnotations() = listOf(
@@ -94,17 +96,8 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
         allPackageAnnotations: List<UAnnotation>
     ) {
 
-//        System.out.println("\nlocation = ${usage.getContainingUClass()?.qualifiedName}\n" +
-//            "usage = $usage, type = $type,\n" +
-//            "anno = $annotation, qualiName = $qualifiedName,\n" +
-//            "method = $method,\n" +
-//            "annos = $annotations,\n" +
-//            "allMethodAnno = $allMemberAnnotations,\n" +
-//            "allClassAnno = $allClassAnnotations,\n" +
-//            "allPackAnno = $allPackageAnnotations")
-
-        val reportMsg = annotation.attributeValues.firstOrNull()?.expression?.evaluateString()
-            ?: return
+        val reportMsg = annotation.attributeValues.firstOrNull()
+            ?.expression?.evaluateString() ?: return
 
         val issue = when (annotation.qualifiedName) {
             needWarningAnnotation -> ISSUE_WHISPER_WARNING
@@ -114,5 +107,35 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
         }
 
         context.report(issue, usage, context.getLocation(usage), reportMsg)
+    }
+
+    override fun getApplicableUastTypes() = listOf(USimpleNameReferenceExpression::class.java)
+
+    override fun createUastHandler(context: JavaContext): UElementHandler = WhisperHintHandler(context)
+
+    private class WhisperHintHandler(private val context: JavaContext) : UElementHandler() {
+
+        override fun visitSimpleNameReferenceExpression(node: USimpleNameReferenceExpression) {
+            val psiField = (node.resolve() as? PsiField) ?: return
+            val modifierList = psiField.modifierList ?: return
+
+            val anno: PsiAnnotation = modifierList.findAnnotation(needErrorAnnotation)
+                ?: modifierList.findAnnotation(needWarningAnnotation)
+                ?: modifierList.findAnnotation(needInfoAnnotation)
+                ?: return
+
+            val psiAnnoValue = anno.parameterList.attributes.firstOrNull()?.value
+            val hint = (ConstantEvaluator().evaluate(psiAnnoValue) as? String)
+                ?: return
+
+            val issue = when (anno.qualifiedName) {
+                needWarningAnnotation -> ISSUE_WHISPER_WARNING
+                needErrorAnnotation -> ISSUE_WHISPER_ERROR
+                needInfoAnnotation -> ISSUE_WHISPER_INFO
+                else -> return
+            }
+
+            context.report(issue, node, context.getLocation(node), hint)
+        }
     }
 }

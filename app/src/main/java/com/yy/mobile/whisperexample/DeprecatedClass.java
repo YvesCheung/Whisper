@@ -5,8 +5,6 @@ import android.support.annotation.Nullable;
 import android.util.Log;
 
 import com.yy.mobile.whisper.DeprecatedBy;
-import com.yy.mobile.whisper.NeedInfo;
-import com.yy.mobile.whisper.NeedWarning;
 
 
 /**
@@ -30,7 +28,7 @@ public class DeprecatedClass {
             replaceWith = "newMethod(%s)",
             receiver = "com.yy.mobile.whisperexample.Utils",
             message = "这个方法有bug，改用 Utils.newMethod 啦",
-            level = DeprecatedBy.Level.Error)
+            level = DeprecatedBy.Level.Warning)
     public void oldMethod(int somethingUseful, double somethingUseless) {
         Log.i("Whisper", "i am old method(" + somethingUseful + ")");
     }

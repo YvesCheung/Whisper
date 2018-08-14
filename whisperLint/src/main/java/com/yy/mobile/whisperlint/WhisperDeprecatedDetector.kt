@@ -74,14 +74,6 @@ class WhisperDeprecatedDetector : Detector(), Detector.UastScanner {
         allClassAnnotations: List<UAnnotation>,
         allPackageAnnotations: List<UAnnotation>
     ) {
-//        System.out.println("\nlocation = ${usage.getContainingUClass()?.qualifiedName}\n" +
-//            "usage = $usage, type = $type,\n" +
-//            "anno = $annotation, qualiName = $qualifiedName,\n" +
-//            "method = $method,\n" +
-//            "annos = $annotations,\n" +
-//            "allMethodAnno = $allMemberAnnotations,\n" +
-//            "allClassAnno = $allClassAnnotations,\n" +
-//            "allPackAnno = $allPackageAnnotations")
 
         val methodCall = usage as? UCallExpression ?: return
 
