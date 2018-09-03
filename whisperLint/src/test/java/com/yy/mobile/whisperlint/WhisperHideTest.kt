@@ -1,0 +1,417 @@
+package com.yy.mobile.whisperlint
+
+import com.android.tools.lint.checks.infrastructure.TestFile
+import com.android.tools.lint.checks.infrastructure.TestFiles.java
+import com.android.tools.lint.checks.infrastructure.TestFiles.kotlin
+import com.android.tools.lint.checks.infrastructure.TestLintTask
+import org.junit.Test
+
+/**
+ * Created by 张宇 on 2018/9/3.
+ * E-mail: zhangyu4@yy.com
+ * YY: 909017428
+ */
+class WhisperHideTest {
+
+    private val hideAnnotation: TestFile = java("""
+                package com.yy.mobile.whisper;
+
+                import java.lang.annotation.Documented;
+                import java.lang.annotation.ElementType;
+                import java.lang.annotation.Retention;
+                import java.lang.annotation.RetentionPolicy;
+                import java.lang.annotation.Target;
+
+                @Documented
+                @Target({ElementType.FIELD,
+                        ElementType.METHOD,
+                        ElementType.CONSTRUCTOR})
+                @Retention(RetentionPolicy.SOURCE)
+                public @interface Hide {
+
+                    String[] friend() default {};
+                }
+    """.trimIndent())
+
+    @Test
+    fun `Check Java @Hide method use in itSelf or friend class`() {
+
+        TestLintTask.lint().files(
+            hideAnnotation,
+            java("""
+                package cc;
+                import com.yy.mobile.whisper.Hide;
+
+                public class TheClassShouldBeHide {
+
+                    public TheClassShouldBeHide() {
+                        method();
+                    }
+
+                    @Hide(friend = {"MainActivity"})
+                    public void method() {
+                        int a = 3 + 4;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc.aa;
+                import cc.TheClassShouldBeHide;
+
+                public class MainActivity {
+
+                    private TheClassShouldBeHide field = new TheClassShouldBeHide();
+
+                    MainActivity(){
+                        field.method();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class MainActivity : android.support.v7.app.AppCompatActivity {
+
+                    override fun onCreate(){
+                        TheClassShouldBeHide().method()
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check Kotlin @Hide method use in itSelf or friend class`() {
+
+        TestLintTask.lint().files(
+            hideAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.Hide
+
+                class TheClassShouldBeHide {
+
+                    init {
+                        method();
+                    }
+
+                    fun method2() = method()
+
+                    @Hide(friend = {"MainActivity"})
+                    fun method() {
+                        val a = 3 + 4
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc.aa;
+                import cc.TheClassShouldBeHide;
+
+                public class MainActivity {
+
+                    private TheClassShouldBeHide field = new TheClassShouldBeHide();
+
+                    MainActivity(){
+
+                        field.method();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class MainActivity : android.support.v7.app.AppCompatActivity {
+
+                    override fun onCreate(){
+                        TheClassShouldBeHide().method()
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check @Hide method in unfriendly class`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            java("""
+                package cc;
+
+                import com.yy.mobile.whisper.Hide;
+
+                public class TheClassShouldBeHide {
+
+                    public TheClassShouldBeHide() {
+                        method();
+                    }
+
+                    @Hide(friend = {"cc.NewActivity"})
+                    public void method() {
+                        int a = 3 + 4;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc.aa;
+                import cc.TheClassShouldBeHide;
+
+                public class MainActivity {
+
+                    private TheClassShouldBeHide field = new TheClassShouldBeHide();
+
+                    MainActivity(){
+                        field.method();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class MainActivity : android.support.v7.app.AppCompatActivity {
+
+                    override fun onCreate(){
+                        TheClassShouldBeHide().method()
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("src/cc/aa/MainActivity.java:9: Error: Methods that can only be accessed in [cc.NewActivity, cc.TheClassShouldBeHide] [HideMember]\n" +
+                "        field.method();\n" +
+                "              ~~~~~~\n" +
+                "src/cc/MainActivity.kt:6: Error: Methods that can only be accessed in [cc.NewActivity, cc.TheClassShouldBeHide] [HideMember]\n" +
+                "        TheClassShouldBeHide().method()\n" +
+                "                               ~~~~~~\n" +
+                "2 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check @Hide method with qualified name in unfriendly class`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            java("""
+                package cc;
+                import com.yy.mobile.whisper.Hide;
+
+                public class TheClassShouldBeHide {
+
+                    public TheClassShouldBeHide() {
+                        method();
+                    }
+
+                    @Hide(friend = {"cc.bb.NewActivity"})
+                    public void method() {
+                        int a = 3 + 4;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc.aa;
+                import cc.TheClassShouldBeHide;
+
+                public class NewActivity {
+
+                    private TheClassShouldBeHide field = new TheClassShouldBeHide();
+
+                    MainActivity(){
+                        field.method();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc.bb
+
+                class NewActivity : android.support.v7.app.AppCompatActivity() {
+
+                    override fun onCreate(){
+                        TheClassShouldBeHide().method()
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("src/cc/aa/NewActivity.java:9: Error: Methods that can only be accessed in [cc.bb.NewActivity, cc.TheClassShouldBeHide] [HideMember]\n" +
+                "        field.method();\n" +
+                "              ~~~~~~\n" +
+                "1 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check static @Hide method in unfriendly class`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            java("""
+                package cc;
+                import com.yy.mobile.whisper.Hide;
+
+                public class TheClassShouldBeHide {
+
+                    public TheClassShouldBeHide() {
+                        method();
+                    }
+
+                    @Hide(friend = {"cc.NewActivity"})
+                    public static void method() {
+                        int a = 3 + 4;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc;
+
+                public class NewActivity {
+
+                    MainActivity(){
+                        TheClassShouldBeHide.method();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package ccc;
+                import cc.TheClassShouldBeHide;
+
+                public class NewActivity {
+
+                    MainActivity(){
+                        TheClassShouldBeHide.method();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc.bb
+
+                import cc.TheClassShouldBeHide
+
+                class NewActivity : android.support.v7.app.AppCompatActivity {
+                    override fun onCreate(){
+                        TheClassShouldBeHide.method()
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("src/ccc/NewActivity.java:7: Error: Methods that can only be accessed in [cc.NewActivity, cc.TheClassShouldBeHide] [HideMember]\n" +
+                "        TheClassShouldBeHide.method();\n" +
+                "                             ~~~~~~\n" +
+                "src/cc/bb/NewActivity.kt:7: Error: Methods that can only be accessed in [cc.NewActivity, cc.TheClassShouldBeHide] [HideMember]\n" +
+                "        TheClassShouldBeHide.method()\n" +
+                "                             ~~~~~~\n" +
+                "2 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check @Hide method in inner unfriendly class`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            kotlin("""
+                package aa.bb.cc
+                import com.yy.mobile.whisper.Hide
+
+                class TheClassShouldBeHide {
+
+                    fun method2() = method()
+
+                    @Hide(friend = ["aa.dd.NewActivity"])
+                    fun method(): Int = 3 + 4
+                }
+            """.trimIndent()),
+            java("""
+                package aa.dd;
+                import aa.bb.cc.*;
+
+                public class NewActivity {
+
+                    public class InnerNewActivity {
+
+                        private TheClassShouldBeHide field = new TheClassShouldBeHide();
+
+                        public void method3() {
+                            field.method();
+                        }
+
+                        private class InnerInnerNewActivity {
+
+                            public void method4() {
+                                field.method();
+                            }
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check @Hide method in inner static unfriendly class`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            kotlin("""
+                package aa.bb.cc
+                import com.yy.mobile.whisper.Hide
+
+                class TheClassShouldBeHide {
+
+                    fun method2() = method()
+
+                    @Hide(friend = ["aa.dd.NewwActivity", "aa.dd.MainActivity"])
+                    fun method(): Int = 3 + 4
+                }
+            """.trimIndent()),
+            java("""
+                package aa.dd;
+                import aa.bb.cc.*;
+
+                public class NewActivity {
+
+                    public static class InnerNewActivity {
+
+                        private TheClassShouldBeHide field = new TheClassShouldBeHide();
+
+                        public void method3() {
+                            field.method();
+                        }
+
+                        private class InnerInnerNewActivity {
+
+                            public void method4() {
+                                field.method();
+                            }
+                        }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa.dd
+
+                class MainActivity : android.support.v7.app.AppCompatActivity() {
+
+                    override fun onCreate() {
+                        TheClassShouldBeHide().method2()
+                        TheClassShouldBeHide().method()
+                    }
+
+                    class NewActivity {
+
+                        init {
+                            TheClassShouldBeHide().method2()
+                            TheClassShouldBeHide().method()
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("")
+    }
+
+    fun `Check @Hide method in many friend class`(){
+
+    }
+}
