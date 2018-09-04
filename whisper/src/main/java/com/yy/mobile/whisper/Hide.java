@@ -12,8 +12,7 @@ import java.lang.annotation.Target;
  * YY: 909017428
  */
 @Documented
-@Target({ElementType.FIELD,
-        ElementType.METHOD,
+@Target({ElementType.METHOD,
         ElementType.CONSTRUCTOR})
 @Retention(RetentionPolicy.SOURCE)
 public @interface Hide {

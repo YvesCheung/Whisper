@@ -13,7 +13,9 @@ import com.intellij.psi.PsiMethod
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
+import org.jetbrains.uast.UastCallKind
 import org.jetbrains.uast.evaluateString
+import org.jetbrains.uast.kotlin.KotlinUFunctionCallExpression
 import java.util.*
 
 /**
@@ -91,7 +93,18 @@ class WhisperDeprecatedDetector : Detector(), Detector.UastScanner {
 
         val methodReceiver =
             if (receiver == null || receiver.isBlank()) {
-                methodCall.receiver?.asSourceString() ?: ""
+                val receiverSrc = methodCall.receiver
+                if (receiverSrc != null) {
+                    if (receiverSrc is KotlinUFunctionCallExpression &&
+                        receiverSrc.kind == UastCallKind.CONSTRUCTOR_CALL) {
+                        receiverSrc.asSourceString().replace("<init>",
+                            receiverSrc.classReference.resolvedName ?: "")
+                    } else {
+                        receiverSrc.asSourceString()
+                    }
+                } else {
+                    ""
+                }
             } else {
                 receiver
             }

@@ -9,7 +9,6 @@ import com.yy.mobile.whisper.Hide
  */
 class HideClass {
 
-    @Hide(friend = arrayOf("KotlinActivity"))
     internal var asd = 3
 
     @Hide(friend = ["com.yy.mobile.whisperexample.JavaActivity"])
