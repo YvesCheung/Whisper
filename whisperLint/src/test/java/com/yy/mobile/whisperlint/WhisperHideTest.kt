@@ -360,7 +360,7 @@ class WhisperHideTest {
 
                     fun method2() = method()
 
-                    @Hide(friend = ["aa.dd.NewwActivity", "aa.dd.MainActivity"])
+                    @Hide(friend = ["aa.dd.NewActivity", "aa.dd.ee.MainActivity"])
                     fun method(): Int = 3 + 4
                 }
             """.trimIndent()),
@@ -370,7 +370,7 @@ class WhisperHideTest {
 
                 public class NewActivity {
 
-                    public static class InnerNewActivity {
+                    public class InnerNewActivity {
 
                         private TheClassShouldBeHide field = new TheClassShouldBeHide();
 
@@ -378,7 +378,7 @@ class WhisperHideTest {
                             field.method();
                         }
 
-                        private class InnerInnerNewActivity {
+                        private static class InnerInnerNewActivity {
 
                             public void method4() {
                                 field.method();
@@ -388,7 +388,8 @@ class WhisperHideTest {
                 }
             """.trimIndent()),
             kotlin("""
-                package aa.dd
+                package aa.dd.ee
+                import aa.bb.cc.TheClassShouldBeHide;
 
                 class MainActivity : android.support.v7.app.AppCompatActivity() {
 
@@ -408,10 +409,67 @@ class WhisperHideTest {
             """.trimIndent()))
             .detector(WhisperHideDetector())
             .run()
-            .expect("")
+            .expect("src/aa/dd/ee/MainActivity.kt:15: Error: Methods that can only be accessed in [aa.dd.NewActivity, aa.dd.ee.MainActivity, aa.bb.cc.TheClassShouldBeHide] [HideMember]\n" +
+                "            TheClassShouldBeHide().method()\n" +
+                "                                   ~~~~~~\n" +
+                "src/aa/dd/NewActivity.java:17: Error: Methods that can only be accessed in [aa.dd.NewActivity, aa.dd.ee.MainActivity, aa.bb.cc.TheClassShouldBeHide] [HideMember]\n" +
+                "                field.method();\n" +
+                "                      ~~~~~~\n" +
+                "2 errors, 0 warnings")
     }
 
-    fun `Check @Hide method in many friend class`(){
+    @Test
+    fun `Check @Hide method in multi friend class`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            kotlin("""
+                package aa
+                import com.yy.mobile.whisper.Hide
 
+                class TheClassShouldBeHide {
+
+                    @Hide(friend = ["aa.NewActivity", "MainActivity", "aa.bb.cc.NewActivity"])
+                    fun method(): Int = 3 + 4
+                }
+            """.trimIndent()),
+            java("""
+                package aa.dd;
+                import aa.*;
+
+                public class NewActivity {
+
+                    private TheClassShouldBeHide field = new TheClassShouldBeHide();
+
+                    public void method3() {
+                        field.method();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa.dd.ee.cc.dd
+                import aa.TheClassShouldBeHide;
+
+                class MainActivity : android.support.v7.app.AppCompatActivity() {
+
+                    override fun onCreate() {
+                        TheClassShouldBeHide().method2()
+                        TheClassShouldBeHide().method()
+                    }
+
+                    inner class NewActivity {
+
+                        init {
+                            TheClassShouldBeHide().method2()
+                            TheClassShouldBeHide().method()
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("src/aa/dd/NewActivity.java:9: Error: Methods that can only be accessed in [aa.NewActivity, MainActivity, aa.bb.cc.NewActivity, aa.TheClassShouldBeHide] [HideMember]\n" +
+                "        field.method();\n" +
+                "              ~~~~~~\n" +
+                "1 errors, 0 warnings")
     }
 }

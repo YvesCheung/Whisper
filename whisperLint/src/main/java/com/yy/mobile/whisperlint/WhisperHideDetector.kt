@@ -10,11 +10,11 @@ import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiMethod
 import org.jetbrains.uast.UAnnotation
+import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.evaluateString
 import org.jetbrains.uast.getContainingUClass
-import org.jetbrains.uast.java.JavaAnnotationArrayInitializerUCallExpression
 import java.util.*
 
 /**
@@ -60,8 +60,8 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
     ) {
         val methodInClass = method?.containingClass ?: return
 
-        val friendClsStr = annotation.findAttributeValue("friend")
-            as? JavaAnnotationArrayInitializerUCallExpression ?: return
+        val friendClsStr = annotation.attributeValues.firstOrNull()?.expression
+            as? UCallExpression ?: return
 
         val friendClsSet = friendClsStr.valueArguments
             .map {
@@ -76,9 +76,6 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
 
         var outerCls: UClass? = usage.getContainingUClass()
         while (outerCls != null) {
-
-            System.out.println("$usage ${outerCls.qualifiedName} ${outerCls.isStatic}")
-
             val quaName = outerCls.qualifiedName
             val simpleName = outerCls.name
 
