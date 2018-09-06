@@ -10,7 +10,8 @@ class WhisperRuleRegistry : IssueRegistry() {
         get() = listOf(
             *WhisperHintDetector.getIssue(),
             *WhisperDeprecatedDetector.getIssue(),
-            *WhisperHideDetector.getIssue())
+            *WhisperHideDetector.getIssue(),
+            *WhisperUseWithDetector.getIssue())
 
     override val api: Int = CURRENT_API
 }

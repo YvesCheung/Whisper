@@ -472,4 +472,60 @@ class WhisperHideTest {
                 "              ~~~~~~\n" +
                 "1 errors, 0 warnings")
     }
+
+    @Test
+    fun `Check @Hide constructor in unfriendly class`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            java("""
+                package aa.bb.cc;
+                import com.yy.mobile.whisper.Hide;
+
+                public class TheClassShouldBeHide {
+
+                    @Hide(friend = {"NewActivity"})
+                    TheClassShouldBeHide() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa.bb.cc;
+
+                public class NewActivity {
+
+                    public void method(){
+                        TheClassShouldBeHide notHide = new TheClassShouldBeHide();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa.bb.cc;
+
+                public class NewActivit {
+
+                    public void method(){
+                        TheClassShouldBeHide shouldHide = new TheClassShouldBeHide();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa.bb.cc
+
+                class OldActivity {
+
+                    fun method(){
+                        val shouldHide = TheClassShouldBeHide();
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("src/aa/bb/cc/NewActivit.java:6: Error: Methods that can only be accessed in [NewActivity, aa.bb.cc.TheClassShouldBeHide] [HideMember]\n" +
+                "        TheClassShouldBeHide shouldHide = new TheClassShouldBeHide();\n" +
+                "                                          ~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "src/aa/bb/cc/OldActivity.kt:6: Error: Methods that can only be accessed in [NewActivity, aa.bb.cc.TheClassShouldBeHide] [HideMember]\n" +
+                "        val shouldHide = TheClassShouldBeHide();\n" +
+                "                         ~~~~~~~~~~~~~~~~~~~~\n" +
+                "2 errors, 0 warnings")
+    }
 }

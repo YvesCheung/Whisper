@@ -44,6 +44,10 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
         fun getIssue() = arrayOf(ISSUE_WHISPER_HIDE)
     }
 
+    override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
+        return type == AnnotationUsageType.METHOD_CALL
+    }
+
     override fun applicableAnnotations() = listOf(hideAnnotation)
 
     override fun visitAnnotationUsage(
