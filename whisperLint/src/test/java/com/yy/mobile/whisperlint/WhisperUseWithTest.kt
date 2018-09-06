@@ -91,7 +91,7 @@ class WhisperUseWithTest {
     }
 
     @Test
-    fun `Check simple Kotlin init without unInit`(){
+    fun `Check simple Kotlin init without unInit`() {
         TestLintTask.lint().files(
             useWithAnnotation,
             kotlin("""
@@ -158,7 +158,7 @@ class WhisperUseWithTest {
     }
 
     @Test
-    fun `Check simple Java init without unInit`(){
+    fun `Check simple Java init without unInit`() {
         TestLintTask.lint().files(
             useWithAnnotation,
             java("""
@@ -225,7 +225,7 @@ class WhisperUseWithTest {
     }
 
     @Test
-    fun `Check Java init without unInit in different scope`(){
+    fun `Check Java init without unInit in different scope`() {
         TestLintTask.lint().files(
             useWithAnnotation,
             java("""
@@ -302,7 +302,7 @@ class WhisperUseWithTest {
     }
 
     @Test
-    fun `Check Kotlin init without unInit in different scope`(){
+    fun `Check Kotlin init and unInit in different scope`() {
         TestLintTask.lint().files(
             useWithAnnotation,
             kotlin("""
@@ -316,7 +316,7 @@ class WhisperUseWithTest {
                     fun init() {
                     }
 
-                    internal fun aInit() {
+                    fun aInit() {
                     }
                 }
             """.trimIndent()),
@@ -370,22 +370,200 @@ class WhisperUseWithTest {
 
                     fun unInit() {
                         with(A()){
-                            a.deInit()
+                            a.aInit()
                         }
 
                         val b = A().also { it.init() }
 
                         b.apply{
-                            init()
+                            aInit()
                         }
                     }
                 }
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/cc/B.java:10: Warning: aa.init() must be used with deInit [MissingUsage]\n" +
-                "        aa.init();\n" +
+            .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check Kotlin init without unInit in different scope`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                public class A {
+
+                    @UseWith("a" + "Init")
+                    fun init() {
+                    }
+
+                    fun aInit() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc;
+
+                public class B {
+
+                    private A a = new A();
+
+                    void onCreate() {
+                        a.init(); //should not lint
+                        final A aa = new A();
+                        aa.init(); //should lint
+
+                        onCallback(new Callback() {
+                            @Override
+                            public void haha() {
+                                a.aInit();
+                            }
+                        });
+                    }
+
+                    void onCallback(Callback cb) {
+                        A aa = new A();
+                        aa.aInit();
+                    }
+
+                    interface Callback {
+                        void haha();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class C {
+
+                    val a = A()
+
+                    init {
+                        a.init() //should Lint
+
+                        a.let {
+                            aInit()
+                        }
+                    }
+
+                    fun aInit() {
+                        var b: A = A().also {
+                            it.init() //should lint
+                        }
+
+                        b = A().also {
+                            it.init() //should not lint
+                        }
+
+                        b.aInit()
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("src/cc/B.java:10: Warning: aa.init() must be used with aInit [MissingUsage]\n" +
+                "        aa.init(); //should lint\n" +
                 "        ~~~~~~~~~\n" +
-                "0 errors, 1 warnings")
+                "src/dd/C.kt:9: Warning: init() must be used with aInit [MissingUsage]\n" +
+                "        a.init() //should Lint\n" +
+                "        ~~~~~~~~\n" +
+                "0 errors, 2 warnings")
+    }
+
+    @Test
+    fun `Check Kotlin init and unInit in Kotlin extend fuction`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                public class A {
+
+                    @UseWith("aInit")
+                    fun init() {
+                    }
+
+                    fun aInit() {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class B {
+
+                    val a = A().apply { init() }
+
+                    fun aInit() {
+                        a.let { it.aInit() }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class C {
+
+                    val a = A().apply { init() }
+
+                    fun aInit() {
+                        a.apply { aInit() }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class D {
+
+                    val a = A().apply { init() }
+
+                    fun aInit() {
+                        val b = a
+                        b.also {
+                            aInit()
+                        }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class E {
+
+                    val a = A().apply { init() }
+
+                    fun aInit() {
+                        a.run { aInit() }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class F {
+
+                    val a = A().apply { init() }
+
+                    fun aInit() {
+                        a.aInit()
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("")
     }
 }

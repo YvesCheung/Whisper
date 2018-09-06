@@ -7,11 +7,15 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiLocalVariable
 import com.intellij.psi.PsiVariable
+import org.jetbrains.kotlin.asJava.elements.KtLightIdentifier
+import org.jetbrains.kotlin.asJava.elements.KtLightMethodImpl
+import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UBlockExpression
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UDeclarationsExpression
 import org.jetbrains.uast.UElement
+import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UExpressionList
 import org.jetbrains.uast.UField
 import org.jetbrains.uast.ULambdaExpression
@@ -20,15 +24,19 @@ import org.jetbrains.uast.UPolyadicExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReferenceExpression
 import org.jetbrains.uast.UReturnExpression
+import org.jetbrains.uast.USimpleNameReferenceExpression
 import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.getQualifiedParentOrThis
+import org.jetbrains.uast.kotlin.psi.UastKotlinPsiVariable
 import org.jetbrains.uast.tryResolve
 import org.jetbrains.uast.util.isAssignment
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 
 /**
  * it's just copy from [com.android.tools.lint.checks.DataFlowAnalyzer].
- * However, [initialReferences] should not be `Collection<PsiVariable>` but `Collection<PsiElement>`
+ * However,
+ * 1. [initialReferences] should not a `Collection<PsiVariable>` but `Collection<PsiElement>`
+ * 2. [returnSelf] should include Kotlin function like `apply` `also` `takeIf`
  */
 /** Helper class for analyzing data flow */
 @Suppress("MemberVisibilityCanBePrivate")
@@ -55,6 +63,7 @@ abstract class DataFlowVisitor(
 
     protected val references: MutableSet<PsiElement> = mutableSetOf()
     protected val instances: MutableSet<UElement> = mutableSetOf()
+    protected val properties: MutableSet<String> = mutableSetOf()
 
     init {
         if (references.isEmpty()) {
@@ -84,15 +93,45 @@ abstract class DataFlowVisitor(
                 if (resolved != null) {
                     if (references.contains(resolved)) {
                         matched = true
+                    } else {
+                        (resolved as? KtLightMethodImpl)?.let { maybeProperty ->
+                            val id = maybeProperty.nameIdentifier as? KtLightIdentifier
+                            (id?.text ?: id?.name)?.let { name ->
+                                if (properties.contains(name)) {
+                                    matched = true
+                                }
+                            }
+                        }
+                        (resolved as? UastKotlinPsiVariable)?.let { maybeProperty ->
+                            if (maybeProperty.psiParent is KtProperty &&
+                                properties.contains(maybeProperty.name)) {
+                                matched = true
+                            }
+                        }
                     }
                 }
             }
-        } else {
-            val lambda = node.uastParent as? ULambdaExpression
-                ?: node.uastParent?.uastParent as? ULambdaExpression
+            System.out.println("rec = ${receiver.asSourceString()} match = $matched")
+        }
+
+        val maybeIt = receiver.maybeIt()
+        if (receiver == null || maybeIt) {
+            val lambda: ULambdaExpression? =
+                if (maybeIt) {
+                    node.uastParent?.uastParent as? ULambdaExpression
+                        ?: node.uastParent?.uastParent?.uastParent as? ULambdaExpression
+                } else {
+                    node.uastParent as? ULambdaExpression
+                        ?: node.uastParent?.uastParent as? ULambdaExpression
+                }
+
             if (lambda != null && lambda.uastParent is UCallExpression &&
                 isKotlinScopingFunction(lambda.uastParent as UCallExpression)) {
-                if (instances.contains(node)) {
+                System.out.println("lambda = ${lambda.uastParent?.asSourceString()}")
+                System.out.println("instance = ${instances.map { it.asSourceString() }} " +
+                    "contain = ${instances.contains(node)} " +
+                    "containP = ${instances.contains(node.uastParent)}")
+                if (instances.contains(node) || instances.contains(node.uastParent)) {
                     matched = true
                 }
             } else if (getMethodName(node) == "with") {
@@ -156,17 +195,33 @@ abstract class DataFlowVisitor(
         return super.visitCallExpression(node)
     }
 
+    private fun UExpression?.maybeIt(): Boolean {
+        val receiver = this ?: return false
+        return receiver is USimpleNameReferenceExpression &&
+            receiver.tryResolve() == null
+    }
+
+    private fun isKotlinReturnSelfFunction(node: UCallExpression): Boolean {
+        val methodName = getMethodName(node).apply { }
+        return methodName == "apply" ||
+            methodName == "also" ||
+            methodName == "takeIf" ||
+            methodName == "takeUnless"
+    }
+
     private fun isKotlinScopingFunction(node: UCallExpression): Boolean {
         val methodName = getMethodName(node)
         return methodName == "apply" ||
             methodName == "run" ||
             methodName == "with" ||
             methodName == "also" ||
-            methodName == "let"
+            methodName == "let" ||
+            methodName == "takeIf" ||
+            methodName == "takeUnless"
     }
 
     override fun afterVisitVariable(node: UVariable) {
-        if (node is ULocalVariable) {
+        if (node is ULocalVariable || node is UField) {
             val initializer = node.uastInitializer
             if (initializer != null) {
                 if (instances.contains(initializer)) {
@@ -183,8 +238,14 @@ abstract class DataFlowVisitor(
     }
 
     protected fun addVariableReference(node: UVariable) {
-        (node.sourcePsi as? PsiVariable)?.let { references.add(it) }
-        (node.javaPsi as? PsiVariable)?.let { references.add(it) }
+        if (node is ULocalVariable) {
+            (node.sourcePsi as? PsiVariable)?.let { references.add(it) }
+            (node.javaPsi as? PsiVariable)?.let { references.add(it) }
+        } else if (node is UField) {
+            properties.add(node.name)
+        }
+        System.out.println("addRef ${node.sourcePsi?.let { it::class.java }} ${node.javaPsi} " +
+            "curRef = ${references.joinToString { it.text }}")
     }
 
     override fun afterVisitBinaryExpression(node: UBinaryExpression) {
@@ -198,10 +259,8 @@ abstract class DataFlowVisitor(
         var clearLhs = false
 
         val rhs = node.rightOperand
-        System.out.println("assign = ${node.asSourceString()}")
         if (instances.contains(rhs)) {
             val lhs = node.leftOperand.tryResolve()
-            System.out.println("lhs = $lhs rhs = $rhs")
             when (lhs) {
                 is UVariable -> addVariableReference(lhs)
                 is PsiLocalVariable -> references.add(lhs)
@@ -212,7 +271,6 @@ abstract class DataFlowVisitor(
             if (resolved != null && references.contains(resolved)) {
                 clearLhs = false
                 val lhs = node.leftOperand.tryResolve()
-                System.out.println("lhs = $lhs rhs = $rhs")
                 when (lhs) {
                     is UVariable -> addVariableReference(lhs)
                     is PsiLocalVariable -> references.add(lhs)
@@ -251,6 +309,9 @@ abstract class DataFlowVisitor(
      * foo instance.
      */
     open fun returnsSelf(call: UCallExpression): Boolean {
+        if (isKotlinReturnSelfFunction(call)) {
+            return true
+        }
         val resolvedCall = call.resolve() ?: return false
         return (call.returnType as? PsiClassType)?.resolve() == resolvedCall.containingClass
     }

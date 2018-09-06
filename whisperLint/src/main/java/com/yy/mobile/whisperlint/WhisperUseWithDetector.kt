@@ -9,9 +9,9 @@ import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
+import com.android.tools.lint.detector.api.getMethodName
 import com.intellij.psi.PsiMethod
 import org.jetbrains.uast.UAnnotation
-import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
@@ -62,9 +62,8 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         }
     }
 
-    override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-        return type == AnnotationUsageType.METHOD_CALL
-    }
+    override fun isApplicableAnnotationUsage(type: AnnotationUsageType) =
+        type == AnnotationUsageType.METHOD_CALL
 
     override fun applicableAnnotations() = listOf(useWithAnnotation)
 
@@ -92,32 +91,27 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
             ?: usage.getContainingUFile() ?: return
 
         val availableCaller = call.getAvailableCaller()
+        val initNode = mutableListOf<UElement>().apply {
+            addAll(availableCaller)
+            add(usage)
+        }
 
+        System.out.println("usage = ${usage.asSourceString()}")
         System.out.println("caller = ${availableCaller.joinToString { it.asSourceString() }}")
 
         var match = false
-        scope.accept(object : DataFlowVisitor(availableCaller, availableCaller.mapNotNull { it.tryResolve() }) {
+        scope.accept(object : DataFlowVisitor(initNode, availableCaller.mapNotNull { it.tryResolve() }) {
+
+            override fun visitElement(node: UElement) = match || super.visitElement(node)
 
             override fun receiver(call: UCallExpression) {
-                System.out.println("receiver ${call.methodName}")
-                if (call.methodName == useWithStr) {
+                System.out.println("receiver ${getMethodName(call)}")
+                if (getMethodName(call) == useWithStr) {
                     if (belongCls == call.resolve()?.containingClass?.qualifiedName) {
                         match = true
                     }
+                    System.out.println("match = ${call.resolve()} $match")
                 }
-            }
-
-            override fun field(field: UElement) {
-                System.out.println("field = $field")
-            }
-
-            override fun visitBinaryExpression(node: UBinaryExpression): Boolean {
-                System.out.println("bin = $node")
-                return super.visitBinaryExpression(node)
-            }
-            override fun afterVisitClass(node: UClass) {
-                super.afterVisitClass(node)
-                System.out.println("afterClass ${node.name}")
             }
         })
 
