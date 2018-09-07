@@ -1034,4 +1034,99 @@ class WhisperUseWithTest {
                 "        ~~~~~~~~~~~~~~\n" +
                 "0 errors, 2 warnings")
     }
+
+    @Test
+    fun `Check Java init and unInit in the return class`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            java("""
+                package cc;
+
+                import com.yy.mobile.whisper.UseWith;
+
+                public class A {
+
+                    @UseWith("deInit")
+                    public B build() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc;
+
+                public class B {
+
+                    public void deInit() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import cc.*;
+
+                public class C {
+
+                    private B b;
+
+                    public init() {
+                        b = new A().build();
+                    }
+
+                    public deInit(){
+                        b.deInit();
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check Java init and without unInit in the return class`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            java("""
+                package cc;
+
+                import com.yy.mobile.whisper.UseWith;
+
+                public class A {
+
+                    @UseWith("deInit")
+                    public B build() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc;
+
+                public class B {
+
+                    public void deInit() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import cc.*;
+
+                public class C {
+
+                    private B b;
+
+                    public deInit() {
+                        b = new A().build();
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("src/aa/C.java:10: Warning: new A().build() must be used with deInit [MissingUsage]\n" +
+                "        b = new A().build();\n" +
+                "            ~~~~~~~~~~~~~~~\n" +
+                "0 errors, 1 warnings")
+    }
 }
