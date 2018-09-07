@@ -22,6 +22,7 @@ import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
 import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.tryResolve
+import org.jetbrains.uast.util.isConstructorCall
 import java.util.*
 
 /**
@@ -91,16 +92,16 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
             ?: usage.getContainingUFile() ?: return
 
         val availableCaller = call.getAvailableCaller()
-        val initNode = mutableListOf<UElement>().apply {
-            addAll(availableCaller)
-            add(usage)
-        }
+
+        val references = availableCaller.filter { !it.isConstructorCall() }.mapNotNull { it.tryResolve() }
+        val elements = listOf(usage) + availableCaller.filter { it.isConstructorCall() }
 
         System.out.println("usage = ${usage.asSourceString()}")
-        System.out.println("caller = ${availableCaller.joinToString { it.asSourceString() }}")
+        System.out.println("reference = ${references.joinToString { it.text }}")
+        System.out.println("elements = ${elements.joinToString { it.asSourceString() }}")
 
         var match = false
-        scope.accept(object : DataFlowVisitor(initNode, availableCaller.mapNotNull { it.tryResolve() }) {
+        scope.accept(object : DataFlowVisitor(elements, references) {
 
             override fun visitElement(node: UElement) = match || super.visitElement(node)
 

@@ -24,6 +24,8 @@ import org.jetbrains.uast.UReferenceExpression
 import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
 import org.jetbrains.uast.UVariable
+import org.jetbrains.uast.UastCallKind.Companion.CONSTRUCTOR_CALL
+import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.getQualifiedParentOrThis
 import org.jetbrains.uast.kotlin.AbstractKotlinUVariable
 import org.jetbrains.uast.kotlin.psi.UastKotlinPsiVariable
@@ -32,10 +34,8 @@ import org.jetbrains.uast.util.isAssignment
 import org.jetbrains.uast.visitor.AbstractUastVisitor
 
 /**
- * it's just copy from [com.android.tools.lint.checks.DataFlowAnalyzer].
- * However,
- * 1. [initialReferences] should not a `Collection<PsiVariable>` but `Collection<PsiElement>`
- * 2. [returnSelf] should include Kotlin function like `apply` `also` `takeIf`
+ * it's just like [com.android.tools.lint.checks.DataFlowAnalyzer],
+ * but this one is more powerful and supports kotlin feature
  */
 /** Helper class for analyzing data flow */
 @Suppress("MemberVisibilityCanBePrivate")
@@ -60,8 +60,16 @@ abstract class DataFlowVisitor(
     ) {
     }
 
-    protected val references: MutableSet<PsiElement> = mutableSetOf()
-    protected val instances: MutableSet<UElement> = mutableSetOf()
+    protected val references: MutableSet<PsiElement> = object : LinkedHashSet<PsiElement>() {
+        override fun add(element: PsiElement): Boolean {
+            return super.add(element)
+        }
+    }
+    protected val instances: MutableSet<UElement> = object : LinkedHashSet<UElement>() {
+        override fun add(element: UElement): Boolean {
+            return super.add(element)
+        }
+    }
     protected val properties: MutableSet<String> = mutableSetOf()
 
     init {
@@ -76,6 +84,15 @@ abstract class DataFlowVisitor(
                     if (parent is UQualifiedReferenceExpression && parent.selector == element) {
                         instances.add(parent)
                     }
+
+                    val receiver = element.receiver
+                    if (receiver == null || element.receiver.maybeIt()) {
+                        val lambda = element.getParentOfType<ULambdaExpression>(ULambdaExpression::class.java, true)
+                        val call = lambda?.uastParent as? UCallExpression
+                        if (call != null && isKotlinScopingFunction(call)) {
+                            instances.add(call)
+                        }
+                    }
                 }
             }
         }
@@ -84,6 +101,16 @@ abstract class DataFlowVisitor(
     private fun includeNode(node: UExpression?): Boolean {
         node ?: return false
 
+        fun isLightMethodButNotClass(psi: PsiElement): Boolean {
+            if (psi is KtLightMethod) {
+                if (node is UCallExpression) {
+                    return node.kind != CONSTRUCTOR_CALL
+                }
+                return true
+            }
+            return false
+        }
+
         if (instances.contains(node)) {
             return true
         } else {
@@ -91,13 +118,10 @@ abstract class DataFlowVisitor(
             if (resolved != null) {
                 if (references.contains(resolved)) {
                     return true
-                } else {
-                    if (resolved is KtLightMethod ||
-                        resolved is UastKotlinPsiVariable) {
-                        if (properties.contains(resolved.text)) {
-                            return true
-                        }
-                    }
+                } else if (
+                    isLightMethodButNotClass(resolved) ||
+                    resolved is UastKotlinPsiVariable) {
+                    return properties.contains(resolved.text)
                 }
             }
         }
@@ -115,20 +139,17 @@ abstract class DataFlowVisitor(
 
         val maybeIt = receiver.maybeIt()
         if (receiver == null || maybeIt) {
-            val lambda: ULambdaExpression? =
-                if (maybeIt) {
-                    node.uastParent?.uastParent as? ULambdaExpression
-                        ?: node.uastParent?.uastParent?.uastParent as? ULambdaExpression
-                } else {
-                    node.uastParent as? ULambdaExpression
-                        ?: node.uastParent?.uastParent as? ULambdaExpression
-                }
-
-            if (lambda != null && lambda.uastParent is UCallExpression &&
-                isKotlinScopingFunction(lambda.uastParent as UCallExpression)) {
-                if (instances.contains(node) || instances.contains(node.uastParent)) {
-                    matched = true
-                }
+            val lambda: ULambdaExpression? = node.getParentOfType(ULambdaExpression::class.java, true)
+            val call = lambda?.uastParent
+            if (call is UCallExpression && isKotlinScopingFunction(call) &&
+                // an expression which is one of the instances
+                (instances.contains(node) ||
+                    // a.apply and a is one of the instances
+                    includeNode(call.receiver) ||
+                    // an expression in lambda, which is one of the instances
+                    instances.contains(lambda.body))
+            ) {
+                matched = true
             } else if (getMethodName(node) == "with") {
                 val args = node.valueArguments
                 if (args.size == 2 && includeNode(args[0]) &&
@@ -192,7 +213,9 @@ abstract class DataFlowVisitor(
 
     private fun UExpression?.maybeIt(): Boolean {
         val receiver = this ?: return false
-        return receiver is USimpleNameReferenceExpression &&
+        val qualifiedParent = receiver.uastParent?.uastParent
+        return qualifiedParent !is UQualifiedReferenceExpression &&
+            receiver is USimpleNameReferenceExpression &&
             receiver.tryResolve() == null
     }
 
@@ -222,6 +245,8 @@ abstract class DataFlowVisitor(
                 addVariableReference(node)
             }
         }
+        //special case:
+        //val field by lazy { ... }
         if (node is AbstractKotlinUVariable) {
             val exp = node.delegateExpression as? UCallExpression
             (exp?.valueArguments?.lastOrNull() as? ULambdaExpression)?.let { lambda ->
@@ -246,15 +271,35 @@ abstract class DataFlowVisitor(
         }
     }
 
+    protected fun removeVariableReference(node: UVariable) {
+        if (node is ULocalVariable) {
+            (node.sourcePsi as? PsiVariable)?.let { references.remove(it) }
+            (node.javaPsi as? PsiVariable)?.let { references.remove(it) }
+        } else if (node is UField) {
+            properties.remove(node.text)
+        }
+    }
+
+    override fun visitBinaryExpression(node: UBinaryExpression): Boolean {
+        if (node.isAssignment()) {
+            // If we reassign one of the variables, clear it out
+            val lhs = node.leftOperand.tryResolve()
+            if (lhs != null) {
+                when (lhs) {
+                    is KtLightMethod -> properties.remove(lhs.text)
+                    is UVariable -> removeVariableReference(lhs)
+                    is PsiLocalVariable -> references.remove(lhs)
+                }
+                references.remove(lhs)
+            }
+        }
+        return super.visitBinaryExpression(node)
+    }
+
     override fun afterVisitBinaryExpression(node: UBinaryExpression) {
         if (!node.isAssignment()) {
             return
         }
-
-        // TEMPORARILY DISABLED; see testDatabaseCursorReassignment
-        // This can result in some false positives right now. Play it
-        // safe instead.
-        var clearLhs = false
 
         val rhs = node.rightOperand
         if (includeNode(rhs)) {
@@ -264,14 +309,6 @@ abstract class DataFlowVisitor(
                 is UVariable -> addVariableReference(lhs)
                 is PsiLocalVariable -> references.add(lhs)
                 is PsiField -> field(rhs)
-            }
-        }
-
-        if (clearLhs) {
-            // If we reassign one of the variables, clear it out
-            val lhs = node.leftOperand.tryResolve()
-            if (lhs != null && lhs != initial && references.contains(lhs)) {
-                references.remove(lhs)
             }
         }
     }
