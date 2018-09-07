@@ -52,7 +52,7 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         fun getIssue() = arrayOf(ISSUE_WHISPER_USE_WITH)
     }
 
-    //override fun getApplicableUastTypes() = listOf(UClass::class.java)
+    override fun getApplicableUastTypes() = listOf(UClass::class.java)
 
     override fun createUastHandler(context: JavaContext): UElementHandler? {
         return object : UElementHandler() {

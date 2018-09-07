@@ -7,9 +7,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiLocalVariable
 import com.intellij.psi.PsiVariable
-import org.jetbrains.kotlin.asJava.elements.KtLightIdentifier
-import org.jetbrains.kotlin.asJava.elements.KtLightMethodImpl
-import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UBlockExpression
 import org.jetbrains.uast.UCallExpression
@@ -27,6 +25,7 @@ import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
 import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.getQualifiedParentOrThis
+import org.jetbrains.uast.kotlin.AbstractKotlinUVariable
 import org.jetbrains.uast.kotlin.psi.UastKotlinPsiVariable
 import org.jetbrains.uast.tryResolve
 import org.jetbrains.uast.util.isAssignment
@@ -82,36 +81,36 @@ abstract class DataFlowVisitor(
         }
     }
 
-    override fun visitCallExpression(node: UCallExpression): Boolean {
-        val receiver = node.receiver
-        var matched = false
-        if (receiver != null) {
-            if (instances.contains(receiver)) {
-                matched = true
-            } else {
-                val resolved = receiver.tryResolve()
-                if (resolved != null) {
-                    if (references.contains(resolved)) {
-                        matched = true
-                    } else {
-                        (resolved as? KtLightMethodImpl)?.let { maybeProperty ->
-                            val id = maybeProperty.nameIdentifier as? KtLightIdentifier
-                            (id?.text ?: id?.name)?.let { name ->
-                                if (properties.contains(name)) {
-                                    matched = true
-                                }
-                            }
-                        }
-                        (resolved as? UastKotlinPsiVariable)?.let { maybeProperty ->
-                            if (maybeProperty.psiParent is KtProperty &&
-                                properties.contains(maybeProperty.name)) {
-                                matched = true
-                            }
+    private fun includeNode(node: UExpression?): Boolean {
+        node ?: return false
+
+        if (instances.contains(node)) {
+            return true
+        } else {
+            val resolved = node.tryResolve()
+            if (resolved != null) {
+                if (references.contains(resolved)) {
+                    return true
+                } else {
+                    if (resolved is KtLightMethod ||
+                        resolved is UastKotlinPsiVariable) {
+                        if (properties.contains(resolved.text)) {
+                            return true
                         }
                     }
                 }
             }
-            System.out.println("rec = ${receiver.asSourceString()} match = $matched")
+        }
+        return false
+    }
+
+    override fun visitCallExpression(node: UCallExpression): Boolean {
+        val receiver = node.receiver
+        var matched = false
+        if (receiver != null) {
+            if (includeNode(receiver)) {
+                matched = true
+            }
         }
 
         val maybeIt = receiver.maybeIt()
@@ -127,16 +126,12 @@ abstract class DataFlowVisitor(
 
             if (lambda != null && lambda.uastParent is UCallExpression &&
                 isKotlinScopingFunction(lambda.uastParent as UCallExpression)) {
-                System.out.println("lambda = ${lambda.uastParent?.asSourceString()}")
-                System.out.println("instance = ${instances.map { it.asSourceString() }} " +
-                    "contain = ${instances.contains(node)} " +
-                    "containP = ${instances.contains(node.uastParent)}")
                 if (instances.contains(node) || instances.contains(node.uastParent)) {
                     matched = true
                 }
             } else if (getMethodName(node) == "with") {
                 val args = node.valueArguments
-                if (args.size == 2 && instances.contains(args[0]) &&
+                if (args.size == 2 && includeNode(args[0]) &&
                     args[1] is ULambdaExpression) {
                     val body = (args[1] as ULambdaExpression).body
                     instances.add(body)
@@ -223,13 +218,18 @@ abstract class DataFlowVisitor(
     override fun afterVisitVariable(node: UVariable) {
         if (node is ULocalVariable || node is UField) {
             val initializer = node.uastInitializer
-            if (initializer != null) {
-                if (instances.contains(initializer)) {
-                    // Instance is stored in a variable
+            if (includeNode(initializer)) {
+                addVariableReference(node)
+            }
+        }
+        if (node is AbstractKotlinUVariable) {
+            val exp = node.delegateExpression as? UCallExpression
+            (exp?.valueArguments?.lastOrNull() as? ULambdaExpression)?.let { lambda ->
+                val body = lambda.body
+                if (includeNode(body)) {
                     addVariableReference(node)
-                } else if (initializer is UReferenceExpression) {
-                    val resolved = initializer.resolve()
-                    if (resolved != null && references.contains(resolved)) {
+                } else if (body is UBlockExpression) {
+                    if (body.expressions.any { includeNode(it) }) {
                         addVariableReference(node)
                     }
                 }
@@ -242,10 +242,8 @@ abstract class DataFlowVisitor(
             (node.sourcePsi as? PsiVariable)?.let { references.add(it) }
             (node.javaPsi as? PsiVariable)?.let { references.add(it) }
         } else if (node is UField) {
-            properties.add(node.name)
+            properties.add(node.text)
         }
-        System.out.println("addRef ${node.sourcePsi?.let { it::class.java }} ${node.javaPsi} " +
-            "curRef = ${references.joinToString { it.text }}")
     }
 
     override fun afterVisitBinaryExpression(node: UBinaryExpression) {
@@ -259,23 +257,13 @@ abstract class DataFlowVisitor(
         var clearLhs = false
 
         val rhs = node.rightOperand
-        if (instances.contains(rhs)) {
+        if (includeNode(rhs)) {
             val lhs = node.leftOperand.tryResolve()
             when (lhs) {
+                is KtLightMethod -> properties.add(lhs.text)
                 is UVariable -> addVariableReference(lhs)
                 is PsiLocalVariable -> references.add(lhs)
                 is PsiField -> field(rhs)
-            }
-        } else if (rhs is UReferenceExpression) {
-            val resolved = rhs.resolve()
-            if (resolved != null && references.contains(resolved)) {
-                clearLhs = false
-                val lhs = node.leftOperand.tryResolve()
-                when (lhs) {
-                    is UVariable -> addVariableReference(lhs)
-                    is PsiLocalVariable -> references.add(lhs)
-                    is PsiField -> field(rhs)
-                }
             }
         }
 

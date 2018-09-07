@@ -529,9 +529,8 @@ class WhisperUseWithTest {
                     val a = A().apply { init() }
 
                     fun aInit() {
-                        val b = a
-                        b.also {
-                            aInit()
+                        a.also {
+                            it.aInit()
                         }
                     }
                 }
@@ -561,9 +560,127 @@ class WhisperUseWithTest {
                         a.aInit()
                     }
                 }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class G {
+
+                    val a = A().apply { init() }
+
+                    fun aInit() {
+                        with(a){
+                            aInit()
+                        }
+                    }
+                }
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("")
+            .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check Kotlin init and unInit in Kotlin assignment`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                public class A {
+
+                    @UseWith("deInit")
+                    fun init() {
+                    }
+
+                    fun deInit() {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class B {
+
+                    val a = A().apply { init() }
+
+                    fun aInit() {
+                        val b = a
+                        b.let { it.deInit() }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class C {
+
+                    val a: A by lazy {
+                        A().also { it.init() }
+                    }
+
+                    fun haha() {
+                        val b = a
+                        val c = b
+                        c.apply { deInit() }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class D {
+
+                    val a = A().apply { init() }
+
+                    fun haha() {
+                        val b = a
+                        val c = b
+                        c.apply { deInit() }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class E {
+
+                    var a: A? = null
+
+                    fun haha() {
+                        a = A().apply { init() }
+
+                        val c = a
+                        c?.apply { deInit() }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class F {
+
+                    var a: A? = null
+
+                    fun haha() {
+                        val b = A().apply { init() }
+
+                        a = b
+
+                        a?.let { it.deInit() }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("No warnings.")
     }
 }
