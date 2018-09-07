@@ -4,10 +4,10 @@ import com.yy.mobile.whisper.UseWith
 
 class A {
 
-    @UseWith("a" + "Init")
+    @UseWith("deInit")
     fun init() {
     }
 
-    fun aInit() {
+    fun deInit() {
     }
 }

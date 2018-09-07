@@ -12,7 +12,7 @@ public class B {
         onCallback(new Callback() {
             @Override
             public void haha() {
-                aa.aInit();
+                aa.deInit();
             }
         });
     }
@@ -20,7 +20,7 @@ public class B {
     void onCallback(Callback cb) {
         if (cb != null) {
             A b = a;
-            b.aInit();
+            b.deInit();
         }
     }
 

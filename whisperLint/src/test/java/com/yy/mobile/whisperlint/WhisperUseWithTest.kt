@@ -979,16 +979,43 @@ class WhisperUseWithTest {
 
                 public class C {
 
-                    void a() {
-                        new A().init();
-                        new A().deInit(); //should lint
+                    private final A instance;
+
+                    public void C(){
+                        instance = new A();
                     }
+
+                    void b() {
+                        instance.init(); //should not lint
+                    }
+
+                    void c() {
+                        instance.deInit();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc;
+
+                public class D {
+
+                    void a() {
+
+                        new A().init();
+
+                        new A().deInit(); // should lint
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc;
+
+                public class E {
 
                     private A instance;
 
                     void b() {
                         instance = new A();
-
                         instance.init(); //should not lint
                     }
 
@@ -999,6 +1026,12 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("")
+            .expect("src/dd/B.kt:29: Warning: init() must be used with deInit [MissingUsage]\n" +
+                "        A().init()   //should lint\n" +
+                "        ~~~~~~~~~~\n" +
+                "src/cc/D.java:7: Warning: new A().init() must be used with deInit [MissingUsage]\n" +
+                "        new A().init();\n" +
+                "        ~~~~~~~~~~~~~~\n" +
+                "0 errors, 2 warnings")
     }
 }

@@ -40,8 +40,8 @@ import org.jetbrains.uast.visitor.AbstractUastVisitor
 /** Helper class for analyzing data flow */
 @Suppress("MemberVisibilityCanBePrivate")
 abstract class DataFlowVisitor(
-    val initial: Collection<UElement>,
-    initialReferences: Collection<PsiElement> = emptyList()
+    private val initial: Collection<UElement>,
+    private val initialReferences: Collection<PsiElement> = emptyList()
 ) : AbstractUastVisitor() {
 
     /** The instance being tracked is the receiver for a method call */
@@ -60,16 +60,8 @@ abstract class DataFlowVisitor(
     ) {
     }
 
-    protected val references: MutableSet<PsiElement> = object : LinkedHashSet<PsiElement>() {
-        override fun add(element: PsiElement): Boolean {
-            return super.add(element)
-        }
-    }
-    protected val instances: MutableSet<UElement> = object : LinkedHashSet<UElement>() {
-        override fun add(element: UElement): Boolean {
-            return super.add(element)
-        }
-    }
+    protected val references: MutableSet<PsiElement> = mutableSetOf()
+    protected val instances: MutableSet<UElement> = mutableSetOf()
     protected val properties: MutableSet<String> = mutableSetOf()
 
     init {
@@ -284,13 +276,12 @@ abstract class DataFlowVisitor(
         if (node.isAssignment()) {
             // If we reassign one of the variables, clear it out
             val lhs = node.leftOperand.tryResolve()
-            if (lhs != null) {
-                when (lhs) {
-                    is KtLightMethod -> properties.remove(lhs.text)
-                    is UVariable -> removeVariableReference(lhs)
-                    is PsiLocalVariable -> references.remove(lhs)
+            if (lhs != null && !initialReferences.contains(lhs)) {
+                when {
+                    lhs is KtLightMethod -> properties.remove(lhs.text)
+                    lhs is UVariable && !lhs.isFinal -> removeVariableReference(lhs)
+                    lhs is PsiLocalVariable -> references.remove(lhs)
                 }
-                references.remove(lhs)
             }
         }
         return super.visitBinaryExpression(node)

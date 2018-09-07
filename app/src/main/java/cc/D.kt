@@ -7,7 +7,7 @@ class D {
 
     fun deInit() {
         a.also {
-            it.aInit()
+            it.deInit()
         }
     }
 }

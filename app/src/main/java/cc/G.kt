@@ -12,12 +12,12 @@ class G {
     fun aInit() {
         with(A()) {
             val unused1 = init()
-            val unused2 = aInit()
+            val unused2 = deInit()
         }
 
         with(a) {
             val unused3 = init()
-            val unused4 = aInit()
+            val unused4 = deInit()
         }
     }
 }
