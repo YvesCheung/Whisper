@@ -188,15 +188,8 @@ abstract class DataFlowVisitor(
         }
 
         for (expression in node.valueArguments) {
-            if (instances.contains(expression)) {
+            if (includeNode(expression)) {
                 argument(node, expression)
-            } else if (expression is UReferenceExpression) {
-                val resolved = expression.resolve()
-
-                if (resolved != null && references.contains(resolved)) {
-                    argument(node, expression)
-                    break
-                }
             }
         }
 

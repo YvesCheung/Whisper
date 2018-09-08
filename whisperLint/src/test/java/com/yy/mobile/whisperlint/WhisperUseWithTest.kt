@@ -148,10 +148,10 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/cc/B.java:8: Warning: a.init() must be used with deInit [MissingUsage]\n" +
+            .expect("src/cc/B.java:8: Warning: a.init() should be used with deInit [MissingUsage]\n" +
                 "        a.init();\n" +
                 "        ~~~~~~~~\n" +
-                "src/ccc/C.kt:9: Warning: init() must be used with deInit [MissingUsage]\n" +
+                "src/ccc/C.kt:9: Warning: init() should be used with deInit [MissingUsage]\n" +
                 "        a.init()\n" +
                 "        ~~~~~~~~\n" +
                 "0 errors, 2 warnings")
@@ -215,10 +215,10 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/cc/B.java:8: Warning: a.init() must be used with deInit [MissingUsage]\n" +
+            .expect("src/cc/B.java:8: Warning: a.init() should be used with deInit [MissingUsage]\n" +
                 "        a.init();\n" +
                 "        ~~~~~~~~\n" +
-                "src/ccc/C.kt:9: Warning: init() must be used with deInit [MissingUsage]\n" +
+                "src/ccc/C.kt:9: Warning: init() should be used with deInit [MissingUsage]\n" +
                 "        a.init()\n" +
                 "        ~~~~~~~~\n" +
                 "0 errors, 2 warnings")
@@ -295,7 +295,7 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/cc/B.java:10: Warning: aa.init() must be used with deInit [MissingUsage]\n" +
+            .expect("src/cc/B.java:10: Warning: aa.init() should be used with deInit [MissingUsage]\n" +
                 "        aa.init();\n" +
                 "        ~~~~~~~~~\n" +
                 "0 errors, 1 warnings")
@@ -466,13 +466,13 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/cc/B.java:10: Warning: aa.init() must be used with aInit [MissingUsage]\n" +
+            .expect("src/cc/B.java:10: Warning: aa.init() should be used with aInit [MissingUsage]\n" +
                 "        aa.init(); // should lint\n" +
                 "        ~~~~~~~~~\n" +
-                "src/dd/C.kt:9: Warning: init() must be used with aInit [MissingUsage]\n" +
+                "src/dd/C.kt:9: Warning: init() should be used with aInit [MissingUsage]\n" +
                 "        a.init() // should lint\n" +
                 "        ~~~~~~~~\n" +
-                "src/dd/C.kt:18: Warning: init() must be used with aInit [MissingUsage]\n" +
+                "src/dd/C.kt:18: Warning: init() should be used with aInit [MissingUsage]\n" +
                 "            it.init() // should lint\n" +
                 "            ~~~~~~~~~\n" +
                 "0 errors, 3 warnings")
@@ -915,7 +915,7 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/dd/B.kt:29: Warning: init() must be used with deInit [MissingUsage]\n" +
+            .expect("src/dd/B.kt:29: Warning: init() should be used with deInit [MissingUsage]\n" +
                 "        A().init()   //should lint\n" +
                 "        ~~~~~~~~~~\n" +
                 "0 errors, 1 warnings")
@@ -1026,10 +1026,10 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/dd/B.kt:29: Warning: init() must be used with deInit [MissingUsage]\n" +
+            .expect("src/dd/B.kt:29: Warning: init() should be used with deInit [MissingUsage]\n" +
                 "        A().init()   //should lint\n" +
                 "        ~~~~~~~~~~\n" +
-                "src/cc/D.java:7: Warning: new A().init() must be used with deInit [MissingUsage]\n" +
+                "src/cc/D.java:7: Warning: new A().init() should be used with deInit [MissingUsage]\n" +
                 "        new A().init();\n" +
                 "        ~~~~~~~~~~~~~~\n" +
                 "0 errors, 2 warnings")
@@ -1124,7 +1124,7 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/aa/C.java:10: Warning: new A().build() must be used with deInit [MissingUsage]\n" +
+            .expect("src/aa/C.java:10: Warning: new A().build() should be used with deInit [MissingUsage]\n" +
                 "        b = new A().build();\n" +
                 "            ~~~~~~~~~~~~~~~\n" +
                 "0 errors, 1 warnings")
@@ -1233,7 +1233,7 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/aa/E.java:15: Warning: a.build() must be used with deInit [MissingUsage]\n" +
+            .expect("src/aa/E.java:15: Warning: a.build() should be used with deInit [MissingUsage]\n" +
                 "        return a.build(); //should lint\n" +
                 "               ~~~~~~~~~\n" +
                 "0 errors, 1 warnings")
@@ -1328,7 +1328,7 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("src/cc/F.kt:8: Warning: build() must be used with deInit [MissingUsage]\n" +
+            .expect("src/cc/F.kt:8: Warning: build() should be used with deInit [MissingUsage]\n" +
                 "        b = A().build() //should lint\n" +
                 "            ~~~~~~~~~~~\n" +
                 "0 errors, 1 warnings")

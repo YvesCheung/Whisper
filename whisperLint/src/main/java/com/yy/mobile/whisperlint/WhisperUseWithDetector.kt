@@ -12,14 +12,14 @@ import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.getMethodName
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiPrimitiveType
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UCallExpression
-import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.ULambdaExpression
+import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UVariable
-import org.jetbrains.uast.asRecursiveLogString
 import org.jetbrains.uast.evaluateString
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
@@ -51,18 +51,90 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
+        val ISSUE_WHISPER_USE_WITH_WRONG_METHOD: Issue = Issue.create(
+            "MissingMethod",
+            "The method specified by @UseWith is absent.",
+            "You should check if the method name is spelling wrong. This method should be " +
+                "declared in the current class or in the return type of the @UseWith annotated method.",
+            Category.CORRECTNESS,
+            8,
+            Severity.ERROR,
+            Implementation(
+                WhisperUseWithDetector::class.java,
+                EnumSet.of(Scope.JAVA_FILE)
+            ))
 
         private const val useWithAnnotation = "$AnnotationPkg.UseWith"
 
-        fun getIssue() = arrayOf(ISSUE_WHISPER_USE_WITH)
+        fun getIssue() = arrayOf(ISSUE_WHISPER_USE_WITH, ISSUE_WHISPER_USE_WITH_WRONG_METHOD)
     }
 
-    override fun getApplicableUastTypes() = listOf(UClass::class.java)
+    override fun getApplicableUastTypes(): List<Class<out UElement>> = listOf(UMethod::class.java)
 
     override fun createUastHandler(context: JavaContext): UElementHandler? {
         return object : UElementHandler() {
-            override fun visitClass(node: UClass) {
-                System.out.println(node.asRecursiveLogString())
+
+            private val evaluator = context.evaluator
+
+            override fun visitMethod(node: UMethod) {
+                val annotations = node.annotations
+                val useWithAnnotation = annotations.find { it.qualifiedName == useWithAnnotation }
+                    ?: return
+
+                val useWithStr = useWithAnnotation.attributeValues.firstOrNull()
+                    ?.expression?.evaluateString()
+                    ?: return
+
+                val methodItSelfClass = node.containingClass?.qualifiedName
+                val methodReturnClass = node.returnType?.takeIf { it !is PsiPrimitiveType }?.canonicalText
+
+                if (methodItSelfClass == null && methodReturnClass == null) {
+                    val msg = "@UseWith can only annotate methods in classes or methods that " +
+                        "have return type."
+                    context.report(
+                        ISSUE_WHISPER_USE_WITH_WRONG_METHOD,
+                        node,
+                        context.getLocation(node),
+                        msg)
+                    return
+                }
+
+                var found = false
+                if (methodItSelfClass != null) {
+                    val methods = evaluator.findClass(methodItSelfClass)
+                        ?.findMethodsByName(useWithStr, true)
+                    if (methods != null && methods.isNotEmpty()) {
+                        found = true
+                    }
+                }
+
+                if (!found && methodReturnClass != null) {
+                    val methods = evaluator.findClass(methodReturnClass)
+                        ?.findMethodsByName(useWithStr, true)
+                    if (methods != null && methods.isNotEmpty()) {
+                        found = true
+                    }
+                }
+
+                if (!found) {
+                    var msg = "Method [$useWithStr] should be declared"
+                    if (methodItSelfClass != null) {
+                        msg += if (methodReturnClass != null) {
+                            " in [$methodItSelfClass] or"
+                        } else {
+                            " in [$methodItSelfClass]"
+                        }
+                    }
+                    if (methodReturnClass != null) {
+                        msg += " in [$methodReturnClass]."
+                    }
+
+                    context.report(
+                        ISSUE_WHISPER_USE_WITH_WRONG_METHOD,
+                        node,
+                        context.getLocation(node),
+                        msg)
+                }
             }
         }
     }
@@ -133,7 +205,8 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         }
 
         if (!match) {
-            report(context, usage, useWithStr)
+            val msg = "${usage.asSourceString()} should be used with $useWithStr"
+            context.report(ISSUE_WHISPER_USE_WITH, usage, context.getLocation(usage), msg)
         }
     }
 
@@ -150,22 +223,19 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
             override fun visitElement(node: UElement) = match || super.visitElement(node)
 
             override fun receiver(call: UCallExpression) {
-                System.out.println("receiver ${getMethodName(call)}")
                 if (getMethodName(call) == methodShouldBeFound) {
                     if (ClassThatMethodShouldBelongTo ==
                         call.resolve()?.containingClass?.qualifiedName) {
                         match = true
                     }
-                    System.out.println("match = ${call.resolve()} $match")
                 }
+            }
+
+            override fun argument(call: UCallExpression, reference: UElement) {
+
             }
         })
         return match
-    }
-
-    private fun report(context: JavaContext, usage: UElement, useWithStr: String) {
-        val msg = "${usage.asSourceString()} must be used with $useWithStr"
-        context.report(ISSUE_WHISPER_USE_WITH, usage, context.getLocation(usage), msg)
     }
 
     private fun UCallExpression.getAvailableCaller(): List<UElement> {
@@ -193,8 +263,6 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         val result = mutableListOf<UElement>()
         val qualified = this.getOutermostQualified()
         if (qualified != null) {
-            System.out.println("qualified = $qualified")
-
             val assign = qualified.uastParent
             if (assign is UBinaryExpression) {
                 result.add(assign.leftOperand)
@@ -202,7 +270,6 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
                 result.add(assign)
             }
         }
-
         return result
     }
 }
