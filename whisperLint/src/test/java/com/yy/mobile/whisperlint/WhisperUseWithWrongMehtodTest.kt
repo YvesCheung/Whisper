@@ -375,4 +375,76 @@ class WhisperUseWithWrongMehtodTest {
             .run()
             .expect("No warnings.")
     }
+
+    @Test
+    fun `Check Kotlin with deInit method of itSelf`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                class A {
+
+                    @UseWith("build")
+                    fun build(): aa.B {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa
+
+                import com.yy.mobile.whisper.UseWith
+
+                class B {
+
+                    fun build()
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("src/cc/A.kt:7: Error: @UseWith can not use the same parameters [build] as the method name. [MissingMethod]\n" +
+                "    @UseWith(\"build\")\n" +
+                "    ^\n" +
+                "1 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check Kotlin with deInit method in object`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                object A {
+
+                    @UseWith("deInit")
+                    fun build(): aa.B {
+                    }
+
+                    @kotlin.jvm.JvmStatic
+                    fun deInit(): aa.B {}
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa
+
+                import com.yy.mobile.whisper.UseWith
+
+                object B {
+
+                    @UseWith("haha")
+                    fun ahah(): cc.A { }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("src/aa/B.kt:7: Error: Method [haha] should be declared in [aa.B] or in [cc.A]. [MissingMethod]\n" +
+                "    @UseWith(\"haha\")\n" +
+                "    ^\n" +
+                "1 errors, 0 warnings")
+    }
 }

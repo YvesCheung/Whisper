@@ -85,6 +85,16 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
                     ?.expression?.evaluateString()
                     ?: return
 
+                if (useWithStr == node.name) {
+                    val msg = "@UseWith can not use the same parameters [$useWithStr] as the method name."
+                    context.report(
+                        ISSUE_WHISPER_USE_WITH_WRONG_METHOD,
+                        node,
+                        context.getLocation(node),
+                        msg)
+                    return
+                }
+
                 val methodItSelfClass = node.containingClass?.qualifiedName
                 val methodReturnClass = node.returnType?.takeIf { it !is PsiPrimitiveType }?.canonicalText
 
@@ -229,10 +239,6 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
                         match = true
                     }
                 }
-            }
-
-            override fun argument(call: UCallExpression, reference: UElement) {
-
             }
         })
         return match
