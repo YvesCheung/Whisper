@@ -2,7 +2,7 @@ package cc
 
 import com.yy.mobile.whisper.UseWith
 
-object A {
+class A {
 
     @UseWith("deInit")
     fun init() {

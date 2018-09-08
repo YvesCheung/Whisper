@@ -1,5 +1,10 @@
 package cc;
 
+import com.yy.mobile.whisper.Immutable;
+
+import java.util.ArrayList;
+import java.util.List;
+
 public class B {
 
     private A a = new A();
@@ -26,5 +31,12 @@ public class B {
 
     interface Callback {
         void haha();
+    }
+
+    @Immutable
+    private List<Integer> list = new ArrayList<>(10);
+
+    private void check(@Immutable List<Integer> list){
+        list.add(3);
     }
 }
