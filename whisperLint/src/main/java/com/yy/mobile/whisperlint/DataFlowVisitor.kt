@@ -22,13 +22,11 @@ import org.jetbrains.uast.UPolyadicExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReferenceExpression
 import org.jetbrains.uast.UReturnExpression
-import org.jetbrains.uast.USimpleNameReferenceExpression
 import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.UastCallKind.Companion.CONSTRUCTOR_CALL
 import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.getQualifiedParentOrThis
 import org.jetbrains.uast.kotlin.AbstractKotlinUVariable
-import org.jetbrains.uast.kotlin.psi.UastKotlinPsiVariable
 import org.jetbrains.uast.tryResolve
 import org.jetbrains.uast.util.isAssignment
 import org.jetbrains.uast.visitor.AbstractUastVisitor
@@ -40,8 +38,9 @@ import org.jetbrains.uast.visitor.AbstractUastVisitor
 /** Helper class for analyzing data flow */
 @Suppress("MemberVisibilityCanBePrivate")
 abstract class DataFlowVisitor(
-    private val initial: Collection<UElement>,
-    private val initialReferences: Collection<PsiElement> = emptyList()
+    private val initElements: Collection<UElement>,
+    private val initReferences: Collection<PsiElement> = emptyList(),
+    initProperties: Collection<String> = emptyList()
 ) : AbstractUastVisitor() {
 
     /** The instance being tracked is the receiver for a method call */
@@ -66,11 +65,11 @@ abstract class DataFlowVisitor(
 
     init {
         if (references.isEmpty()) {
-            references.addAll(initialReferences)
+            references.addAll(initReferences)
         }
         if (instances.isEmpty()) {
-            instances.addAll(initial)
-            for (element in initial) {
+            instances.addAll(initElements)
+            for (element in initElements) {
                 if (element is UCallExpression) {
                     val parent = element.uastParent
                     if (parent is UQualifiedReferenceExpression && parent.selector == element) {
@@ -81,12 +80,15 @@ abstract class DataFlowVisitor(
                     if (receiver == null || element.receiver.maybeIt()) {
                         val lambda = element.getParentOfType<ULambdaExpression>(ULambdaExpression::class.java, true)
                         val call = lambda?.uastParent as? UCallExpression
-                        if (call != null && isKotlinScopingFunction(call)) {
+                        if (call != null && call.isKotlinScopingFunction()) {
                             instances.add(call)
                         }
                     }
                 }
             }
+        }
+        if (properties.isEmpty()) {
+            properties.addAll(initProperties)
         }
     }
 
@@ -103,6 +105,8 @@ abstract class DataFlowVisitor(
             return false
         }
 
+        fun isKotlinVariable(psi: PsiElement) = psi is PsiVariable && psi.language.id == "kotlin"
+
         if (instances.contains(node)) {
             return true
         } else {
@@ -110,9 +114,8 @@ abstract class DataFlowVisitor(
             if (resolved != null) {
                 if (references.contains(resolved)) {
                     return true
-                } else if (
-                    isLightMethodButNotClass(resolved) ||
-                    resolved is UastKotlinPsiVariable) {
+                } else if (isLightMethodButNotClass(resolved) ||
+                    isKotlinVariable(resolved)) {
                     return properties.contains(resolved.text)
                 }
             }
@@ -133,7 +136,7 @@ abstract class DataFlowVisitor(
         if (receiver == null || maybeIt) {
             val lambda: ULambdaExpression? = node.getParentOfType(ULambdaExpression::class.java, true)
             val call = lambda?.uastParent
-            if (call is UCallExpression && isKotlinScopingFunction(call) &&
+            if (call is UCallExpression && call.isKotlinScopingFunction() &&
                 // an expression which is one of the instances
                 (instances.contains(node) ||
                     // a.apply and a is one of the instances
@@ -158,7 +161,7 @@ abstract class DataFlowVisitor(
         }
 
         if (matched) {
-            if (!initial.contains(node)) {
+            if (!initElements.contains(node)) {
                 receiver(node)
             }
             if (returnsSelf(node)) {
@@ -174,7 +177,7 @@ abstract class DataFlowVisitor(
                 }
             }
 
-            if (isKotlinScopingFunction(node)) {
+            if (node.isKotlinScopingFunction()) {
                 (node.valueArguments.lastOrNull() as? ULambdaExpression)?.let {
                     val body = it.body
                     instances.add(body)
@@ -194,33 +197,6 @@ abstract class DataFlowVisitor(
         }
 
         return super.visitCallExpression(node)
-    }
-
-    private fun UExpression?.maybeIt(): Boolean {
-        val receiver = this ?: return false
-        val qualifiedParent = receiver.uastParent?.uastParent
-        return qualifiedParent !is UQualifiedReferenceExpression &&
-            receiver is USimpleNameReferenceExpression &&
-            receiver.tryResolve() == null
-    }
-
-    private fun isKotlinReturnSelfFunction(node: UCallExpression): Boolean {
-        val methodName = getMethodName(node).apply { }
-        return methodName == "apply" ||
-            methodName == "also" ||
-            methodName == "takeIf" ||
-            methodName == "takeUnless"
-    }
-
-    private fun isKotlinScopingFunction(node: UCallExpression): Boolean {
-        val methodName = getMethodName(node)
-        return methodName == "apply" ||
-            methodName == "run" ||
-            methodName == "with" ||
-            methodName == "also" ||
-            methodName == "let" ||
-            methodName == "takeIf" ||
-            methodName == "takeUnless"
     }
 
     override fun afterVisitVariable(node: UVariable) {
@@ -269,7 +245,7 @@ abstract class DataFlowVisitor(
         if (node.isAssignment()) {
             // If we reassign one of the variables, clear it out
             val lhs = node.leftOperand.tryResolve()
-            if (lhs != null && !initialReferences.contains(lhs)) {
+            if (lhs != null && !initReferences.contains(lhs)) {
                 when {
                     lhs is KtLightMethod -> properties.remove(lhs.text)
                     lhs is UVariable && !lhs.isFinal -> removeVariableReference(lhs)
@@ -318,7 +294,7 @@ abstract class DataFlowVisitor(
      * foo instance.
      */
     open fun returnsSelf(call: UCallExpression): Boolean {
-        if (isKotlinReturnSelfFunction(call)) {
+        if (call.isKotlinReturnSelfFunction()) {
             return true
         }
         val resolvedCall = call.resolve() ?: return false

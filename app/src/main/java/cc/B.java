@@ -29,6 +29,10 @@ public class B {
         }
     }
 
+    void deInit(){
+
+    }
+
     interface Callback {
         void haha();
     }

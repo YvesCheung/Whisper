@@ -17,6 +17,7 @@ import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
+import org.jetbrains.uast.UField
 import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UVariable
@@ -209,8 +210,10 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
                 // so find the clean up method that belongs to the return type
                 val availableReturn = call.getAvailableReturnReference()
                 val references = availableReturn.mapNotNull { it.tryResolve() }
+                val properties = availableReturn.mapNotNull { (it as? UField)?.text }
                 val elements = listOf(usage)
-                match = findCleanUpMethod(scope, useWithStr, methodReturnClass, elements, references)
+                match = findCleanUpMethod(scope, useWithStr, methodReturnClass,
+                    elements, references, properties)
             }
         }
 
@@ -224,11 +227,12 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         scope: UElement,
         methodShouldBeFound: String,
         ClassThatMethodShouldBelongTo: String,
-        initElements: List<UElement>,
-        initReferences: List<PsiElement>
+        initElements: List<UElement> = emptyList(),
+        initReferences: List<PsiElement> = emptyList(),
+        initProperties: List<String> = emptyList()
     ): Boolean {
         var match = false
-        scope.accept(object : DataFlowVisitor(initElements, initReferences) {
+        scope.accept(object : DataFlowVisitor(initElements, initReferences, initProperties) {
 
             override fun visitElement(node: UElement) = match || super.visitElement(node)
 
@@ -269,13 +273,22 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         val result = mutableListOf<UElement>()
         val qualified = this.getOutermostQualified()
         if (qualified != null) {
-            val assign = qualified.uastParent
-            if (assign is UBinaryExpression) {
-                result.add(assign.leftOperand)
-            } else if (assign is UVariable) {
-                result.add(assign)
+            val assignExpect = qualified.getParentOfType<UBinaryExpression>(
+                UBinaryExpression::class.java, true)
+
+            if (assignExpect != null) {
+                result.add(assignExpect.leftOperand)
+            }
+
+            val declareExpect = qualified.getParentOfType<UVariable>(
+                UVariable::class.java, true)
+
+            if (declareExpect != null) {
+                result.add(declareExpect)
             }
         }
         return result
     }
+
+
 }

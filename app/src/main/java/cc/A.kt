@@ -10,4 +10,9 @@ class A {
 
     fun deInit() {
     }
+
+    @UseWith("deInit")
+    fun build(): B {
+        return B()
+    }
 }

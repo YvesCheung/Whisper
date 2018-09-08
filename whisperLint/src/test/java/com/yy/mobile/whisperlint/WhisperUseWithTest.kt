@@ -1333,4 +1333,111 @@ class WhisperUseWithTest {
                 "            ~~~~~~~~~~~\n" +
                 "0 errors, 1 warnings")
     }
+
+    @Test
+    fun `Check Kotlin init and unInit in the return class, different reference2`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                class A {
+
+                    @UseWith("deInit")
+                    fun build(): B {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class B {
+
+                    fun deInit() {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class C {
+                    private val b: B = A().build() //should not lint
+
+                    fun b() {
+                        b.deInit()
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class D {
+
+                    private var b = B()
+
+                    fun a() {
+                        b = A().build() //should not lint
+                    }
+
+                    fun b() {
+                        b.deInit()
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class E {
+
+                    private val b by lazy {
+                        A().build() //should not lint
+                    }
+
+                    fun b() {
+                        b.deInit()
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class F {
+
+                    private var b: B? = A().let { it.build() } //should not lint
+
+                    fun a() {
+                        b.deInit()
+                    }
+
+                    fun b() {
+                        A().let {
+                            it.init() //should not lint
+                        }.also{
+                            it.deInit()
+                        }
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class G {
+
+                    private var b: B? = A().let { it.build() }
+
+                    fun b() {
+                        b = A().init() //should not lint
+
+                        b.also{
+                            it.deInit()
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("")
+    }
 }

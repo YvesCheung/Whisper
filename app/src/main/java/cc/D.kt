@@ -1,15 +1,14 @@
-package dd
-
-import cc.A
+package cc
 
 class D {
 
-    private lateinit var a: A
+    private var b = B()
 
-    fun deInit() {
-        a = A().apply { init() }
-        a.also {
-            it.deInit()
-        }
+    fun a() {
+        b = A().build() //should not lint
+    }
+
+    fun b() {
+        b.deInit()
     }
 }
