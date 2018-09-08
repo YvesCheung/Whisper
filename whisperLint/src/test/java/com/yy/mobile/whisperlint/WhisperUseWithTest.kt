@@ -1069,11 +1069,11 @@ class WhisperUseWithTest {
 
                     private B b;
 
-                    public init() {
+                    public void init() {
                         b = new A().build();
                     }
 
-                    public deInit(){
+                    public void deInit(){
                         b.deInit();
                     }
                 }
@@ -1117,7 +1117,7 @@ class WhisperUseWithTest {
 
                     private B b;
 
-                    public deInit() {
+                    public void deInit() {
                         b = new A().build();
                     }
                 }
@@ -1127,6 +1127,210 @@ class WhisperUseWithTest {
             .expect("src/aa/C.java:10: Warning: new A().build() must be used with deInit [MissingUsage]\n" +
                 "        b = new A().build();\n" +
                 "            ~~~~~~~~~~~~~~~\n" +
+                "0 errors, 1 warnings")
+    }
+
+    @Test
+    fun `Check Java init and unInit in the return class, different reference`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            java("""
+                package cc;
+
+                import com.yy.mobile.whisper.UseWith;
+
+                public class A {
+
+                    @UseWith("deInit")
+                    public B build() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package cc;
+
+                public class B {
+
+                    public void deInit() {
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import cc.*;
+
+                public class C {
+
+                    private B b;
+
+                    public void a() {
+                        b = new A().build(); //should not lint
+                        b.deInit();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import cc.*;
+
+                public class D {
+
+                    public void a() {
+                        B b = new A().build(); //should not lint
+                        b.deInit();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import cc.*;
+
+                public class E {
+
+                    private A a = new A();
+
+                    public void c() {
+                        B b = a.build(); //should not lint
+                        b.deInit();
+                    }
+
+                    public B create() {
+                        return a.build(); //should lint
+                    }
+
+                    public void destroy() {
+                        create().deInit();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import cc.*;
+
+                public class F {
+
+                    private A a = new A();
+                    private B b;
+
+                    public void c() {
+                        B b = a.build(); //should not lint
+                        b.deInit();
+                    }
+
+                    public B create() {
+                        b = a.build(); //should not lint
+                        return b;
+                    }
+
+                    public void destroy() {
+                        b.deInit();
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("src/aa/E.java:15: Warning: a.build() must be used with deInit [MissingUsage]\n" +
+                "        return a.build(); //should lint\n" +
+                "               ~~~~~~~~~\n" +
+                "0 errors, 1 warnings")
+    }
+
+    @Test
+    fun `Check Kotlin init and unInit in the return class, different reference`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                class A {
+
+                    @UseWith("deInit")
+                    fun build(): B {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class B {
+
+                    fun deInit() {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class C {
+                    private lateinit var b: B
+
+                    fun a() {
+                        b = A().build() //should not lint
+                    }
+
+                    fun b() {
+                        b.deInit()
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class D {
+
+                    fun a() {
+                        val b = A().build() //should not lint
+                        b.deInit()
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class E {
+
+                    private var b: B? = null
+
+                    fun a() {
+                        b = A().build() //should not lint
+                    }
+
+                    fun b() {
+                        b?.deInit()
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package cc
+
+                class F {
+
+                    private var b: B? = null
+
+                    fun a() {
+                        b = A().build() //should lint
+                    }
+
+                    fun b() {
+                        b = A().let {
+                            it.init() //should not lint
+                        }.also{
+                            it.deInit()
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("src/cc/F.kt:8: Warning: build() must be used with deInit [MissingUsage]\n" +
+                "        b = A().build() //should lint\n" +
+                "            ~~~~~~~~~~~\n" +
                 "0 errors, 1 warnings")
     }
 }
