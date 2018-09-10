@@ -1,7 +1,6 @@
 package com.yy.mobile.whisperlint
 
 import com.android.tools.lint.detector.api.getMethodName
-import com.android.tools.lint.detector.api.isKotlin
 import com.android.tools.lint.detector.api.skipParentheses
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
@@ -106,8 +105,6 @@ abstract class DataFlowVisitor(
             return false
         }
 
-        fun isKotlinVariable(psi: PsiElement) = psi is PsiVariable && isKotlin(psi.language)
-
         if (instances.contains(node)) {
             return true
         } else {
@@ -116,7 +113,7 @@ abstract class DataFlowVisitor(
                 if (references.contains(resolved)) {
                     return true
                 } else if (isLightMethodButNotConstructor(resolved) ||
-                    isKotlinVariable(resolved)) {
+                    resolved is PsiVariable) {
                     return properties.contains(resolved.text)
                 }
             }

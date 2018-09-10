@@ -1,10 +1,16 @@
 package com.yy.mobile.whisperlint
 
 import com.android.tools.lint.detector.api.getMethodName
+import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UCallExpression
+import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
+import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
+import org.jetbrains.uast.UVariable
+import org.jetbrains.uast.getOutermostQualified
+import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.tryResolve
 
 /**
@@ -37,4 +43,47 @@ fun UCallExpression.isKotlinScopingFunction(): Boolean {
         methodName == "let" ||
         methodName == "takeIf" ||
         methodName == "takeUnless"
+}
+
+fun UCallExpression.getAvailableCaller(): List<UElement> {
+    val result = mutableListOf<UElement>()
+    val receiver = this.receiver
+    if (receiver != null) {
+        result.add(receiver)
+    }
+
+    val lambda = this.getParentOfType<ULambdaExpression>(ULambdaExpression::class.java, true)
+    (lambda?.uastParent as? UCallExpression)?.let { caller ->
+        val lambdaReceiver = caller.receiver
+        if (lambdaReceiver != null) {
+            result.add(lambdaReceiver)
+        }
+
+        val arguments = caller.valueArguments.filter { it !is ULambdaExpression }
+        result.addAll(arguments)
+    }
+
+    return result
+}
+
+fun UExpression.getAvailableReturnReference(): List<UElement> {
+    val result = mutableListOf<UElement>()
+    val qualified: UExpression? = this.getOutermostQualified()
+        ?: this as? UCallExpression
+    if (qualified != null) {
+        val assignExpect = qualified.getParentOfType<UBinaryExpression>(
+            UBinaryExpression::class.java, true)
+
+        if (assignExpect != null) {
+            result.add(assignExpect.leftOperand)
+        }
+
+        val declareExpect = qualified.getParentOfType<UVariable>(
+            UVariable::class.java, true)
+
+        if (declareExpect != null) {
+            result.add(declareExpect)
+        }
+    }
+    return result
 }

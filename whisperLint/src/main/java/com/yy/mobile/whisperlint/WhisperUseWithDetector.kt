@@ -14,18 +14,13 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiPrimitiveType
 import org.jetbrains.uast.UAnnotation
-import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UField
-import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.UMethod
-import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.evaluateString
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
-import org.jetbrains.uast.getOutermostQualified
-import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.tryResolve
 import org.jetbrains.uast.util.isConstructorCall
 import java.util.*
@@ -247,48 +242,4 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         })
         return match
     }
-
-    private fun UCallExpression.getAvailableCaller(): List<UElement> {
-        val result = mutableListOf<UElement>()
-        val receiver = this.receiver
-        if (receiver != null) {
-            result.add(receiver)
-        }
-
-        val lambda = this.getParentOfType<ULambdaExpression>(ULambdaExpression::class.java, true)
-        (lambda?.uastParent as? UCallExpression)?.let { caller ->
-            val lambdaReceiver = caller.receiver
-            if (lambdaReceiver != null) {
-                result.add(lambdaReceiver)
-            }
-
-            val arguments = caller.valueArguments.filter { it !is ULambdaExpression }
-            result.addAll(arguments)
-        }
-
-        return result
-    }
-
-    private fun UCallExpression.getAvailableReturnReference(): List<UElement> {
-        val result = mutableListOf<UElement>()
-        val qualified = this.getOutermostQualified()
-        if (qualified != null) {
-            val assignExpect = qualified.getParentOfType<UBinaryExpression>(
-                UBinaryExpression::class.java, true)
-
-            if (assignExpect != null) {
-                result.add(assignExpect.leftOperand)
-            }
-
-            val declareExpect = qualified.getParentOfType<UVariable>(
-                UVariable::class.java, true)
-
-            if (declareExpect != null) {
-                result.add(declareExpect)
-            }
-        }
-        return result
-    }
-
-
 }
