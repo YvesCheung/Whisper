@@ -1,6 +1,7 @@
 package com.yy.mobile.whisperlint
 
 import com.android.tools.lint.detector.api.getMethodName
+import com.android.tools.lint.detector.api.isKotlin
 import com.android.tools.lint.detector.api.skipParentheses
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
@@ -95,7 +96,7 @@ abstract class DataFlowVisitor(
     private fun includeNode(node: UExpression?): Boolean {
         node ?: return false
 
-        fun isLightMethodButNotClass(psi: PsiElement): Boolean {
+        fun isLightMethodButNotConstructor(psi: PsiElement): Boolean {
             if (psi is KtLightMethod) {
                 if (node is UCallExpression) {
                     return node.kind != CONSTRUCTOR_CALL
@@ -105,7 +106,7 @@ abstract class DataFlowVisitor(
             return false
         }
 
-        fun isKotlinVariable(psi: PsiElement) = psi is PsiVariable && psi.language.id == "kotlin"
+        fun isKotlinVariable(psi: PsiElement) = psi is PsiVariable && isKotlin(psi.language)
 
         if (instances.contains(node)) {
             return true
@@ -114,7 +115,7 @@ abstract class DataFlowVisitor(
             if (resolved != null) {
                 if (references.contains(resolved)) {
                     return true
-                } else if (isLightMethodButNotClass(resolved) ||
+                } else if (isLightMethodButNotConstructor(resolved) ||
                     isKotlinVariable(resolved)) {
                     return properties.contains(resolved.text)
                 }
@@ -129,6 +130,16 @@ abstract class DataFlowVisitor(
         if (receiver != null) {
             if (includeNode(receiver)) {
                 matched = true
+            } else if (receiver is UQualifiedReferenceExpression) {
+                val rec = receiver.receiver
+                val sel = receiver.selector as? UCallExpression
+                if (sel != null) {
+                    if (returnsSelf(sel) && includeNode(rec)) {
+                        matched = true
+                    } else if (sel.isKotlinScopingFunction() && includeNode(sel)) {
+                        matched = true
+                    }
+                }
             }
         }
 

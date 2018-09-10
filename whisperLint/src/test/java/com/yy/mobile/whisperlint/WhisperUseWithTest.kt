@@ -1413,7 +1413,7 @@ class WhisperUseWithTest {
 
                     fun b() {
                         A().let {
-                            it.init() //should not lint
+                            it.build() //should not lint
                         }.also{
                             it.deInit()
                         }
@@ -1428,7 +1428,7 @@ class WhisperUseWithTest {
                     private var b: B? = A().let { it.build() }
 
                     fun b() {
-                        b = A().init() //should not lint
+                        b = A().build() //should not lint
 
                         b.also{
                             it.deInit()
@@ -1438,6 +1438,6 @@ class WhisperUseWithTest {
             """.trimIndent()))
             .detector(WhisperUseWithDetector())
             .run()
-            .expect("")
+            .expect("No warnings.")
     }
 }
