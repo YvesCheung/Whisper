@@ -2,10 +2,9 @@ package aa;
 
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.concurrent.LinkedBlockingDeque;
 
 /**
  * Created by 张宇 on 2018/9/10.
@@ -15,25 +14,23 @@ import java.util.Map;
 public class A {
 
     @Immutable
-    private Map<String, String> map = new LinkedHashMap<>();
+    private LinkedBlockingDeque<Long> que = new LinkedBlockingDeque<>();
 
     public void a() {
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            if (entry.getKey().equals(entry.getValue())) {
-                entry.setValue("asd"); //should lint
-            }
+        que.drainTo(new ArrayList<Long>()); //should lint
+
+        try {
+            que.putLast(3L); //should lint
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 
     public void b() {
-        Collection<String> collection = map.values();
-        if (collection.isEmpty()) {
-            collection.add("asd"); //should lint
-        }
-        Iterator<String> it = collection.iterator();
-        while (it.hasNext()) {
-            if (it.next().equals("haha")) {
-                it.remove();
+        Iterator<Long> it = que.descendingIterator();
+        for (; it.hasNext(); ) {
+            if (it.next() > 3L) {
+                it.remove(); //should lint
             }
         }
     }

@@ -327,4 +327,209 @@ class WhisperImmutableTest {
                 "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
                 "5 errors, 0 warnings")
     }
+
+    @Test
+    fun `Check Java field @Immutable set and modify`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    private Set<String> set = new LinkedHashSet<String>() {
+                        {
+                            add("1");
+                        }
+                    };
+
+                    public void a() {
+                        for (Iterator it = set.iterator(); it.hasNext(); ) {
+                            if (it.next().equals("1")) {
+                                it.remove(); //should lint
+                            }
+                        }
+                    }
+
+                    public void b() {
+                        set.clear(); //should lint
+
+                        if (set.containsAll(Collections.singleton("1"))) {
+                            if (set.size() > 3) {
+                                set = new LinkedHashSet<>(set);
+                            }
+                        }
+
+                        for (Object a : set.toArray()) {
+                            a.getClass();
+                        }
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B {
+
+                    @Immutable
+                    private List<String> list = Arrays.asList("1", "2");
+
+                    @Immutable
+                    private LinkedHashSet<String> set = new LinkedHashSet<>(list);
+
+                    public void a() {
+                        for (String a : list) {
+                            a = a.replace('1', '2');
+                        }
+                        List<String> newList = list.subList(0, 2);
+                        set = new LinkedHashSet<>(newList);
+                        set.remove("3"); //should lint
+                    }
+
+                    public void b() {
+                        if (!set.isEmpty()) {
+                            set.remove("1"); //should lint
+                        }
+                        TreeSet<String> newSet = new TreeSet<>(set);
+                        newSet.remove("1"); //should not lint
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:19: Error: you cannot invoke the [remove()] method on an immutable object. [ImmutableObject]\n" +
+                "                it.remove(); //should lint\n" +
+                "                ~~~~~~~~~~~\n" +
+                "    src/aa/A.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:25: Error: you cannot invoke the [clear()] method on an immutable object. [ImmutableObject]\n" +
+                "        set.clear(); //should lint\n" +
+                "        ~~~~~~~~~~~\n" +
+                "    src/aa/A.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:21: Error: you cannot invoke the [remove(\"3\")] method on an immutable object. [ImmutableObject]\n" +
+                "        set.remove(\"3\"); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:13: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:26: Error: you cannot invoke the [remove(\"1\")] method on an immutable object. [ImmutableObject]\n" +
+                "            set.remove(\"1\"); //should lint\n" +
+                "            ~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:13: This reference is annotated by @Immutable\n" +
+                "4 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check Java field @Immutable queue and modify`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+                import java.util.concurrent.ArrayBlockingQueue;
+
+                public class A {
+
+                    @Immutable
+                    private Queue<Long> que = new PriorityQueue<>();
+
+                    public void a() {
+                        que.offer(3L); //should lint
+
+                        long a = que.peek(); //should not lint
+
+                        long b = que.poll(); //should lint
+                    }
+
+                    public void b() {
+                        ArrayDeque<Long> deque = new ArrayDeque<>(que);
+                        deque.addFirst(3L); // should not lint
+
+                        que = new ArrayBlockingQueue<>(3);
+                        que.remove(); //should lint
+
+                        Iterator<Long> it = que.iterator();
+                        do {
+                            if (it.next() == 3L) {
+                                it.remove(); //should lint
+                            }
+                        } while (it.hasNext());
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+                import java.util.concurrent.LinkedBlockingDeque;
+
+                public class B {
+                    @Immutable
+                    private LinkedBlockingDeque<Long> que = new LinkedBlockingDeque<>();
+
+                    public void a() {
+                        que.drainTo(new ArrayList<Long>()); //should lint
+
+                        try {
+                            que.putLast(3L); //should lint
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                    }
+
+                    public void b() {
+                        Iterator<Long> it = que.descendingIterator();
+                        for (; it.hasNext(); ) {
+                            if (it.next() > 3L) {
+                                it.remove(); //should lint
+                            }
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:14: Error: you cannot invoke the [offer(3)] method on an immutable object. [ImmutableObject]\n" +
+                "        que.offer(3L); //should lint\n" +
+                "        ~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:11: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:18: Error: you cannot invoke the [poll()] method on an immutable object. [ImmutableObject]\n" +
+                "        long b = que.poll(); //should lint\n" +
+                "                 ~~~~~~~~~~\n" +
+                "    src/aa/A.java:11: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:26: Error: you cannot invoke the [remove()] method on an immutable object. [ImmutableObject]\n" +
+                "        que.remove(); //should lint\n" +
+                "        ~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:11: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:31: Error: you cannot invoke the [remove()] method on an immutable object. [ImmutableObject]\n" +
+                "                it.remove(); //should lint\n" +
+                "                ~~~~~~~~~~~\n" +
+                "    src/aa/A.java:11: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:13: Error: you cannot invoke the [drainTo(ArrayList())] method on an immutable object. [ImmutableObject]\n" +
+                "        que.drainTo(new ArrayList<Long>()); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:16: Error: you cannot invoke the [putLast(3)] method on an immutable object. [ImmutableObject]\n" +
+                "            que.putLast(3L); //should lint\n" +
+                "            ~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:26: Error: you cannot invoke the [remove()] method on an immutable object. [ImmutableObject]\n" +
+                "                it.remove(); //should lint\n" +
+                "                ~~~~~~~~~~~\n" +
+                "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
+                "7 errors, 0 warnings")
+    }
 }

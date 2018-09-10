@@ -16,11 +16,9 @@ import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
-import org.jetbrains.uast.UForEachExpression
 import org.jetbrains.uast.asRecursiveLogString
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
-import org.jetbrains.uast.tryResolve
 import java.util.*
 
 /**
@@ -96,13 +94,17 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             "offerLast",
             "removeFirst",
             "removeLast",
+            "put",
+            "putFirst",
+            "putLast",
             "poll",
             "pollFirst",
             "pollLast",
             "removeFirstOccurrence",
             "removeLastOccurrence",
             "push",
-            "pop"
+            "pop",
+            "drainTo"
         )
 
         private const val vectorCls = "java.util.Vector"
