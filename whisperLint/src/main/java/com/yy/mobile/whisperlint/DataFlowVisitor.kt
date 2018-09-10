@@ -16,6 +16,7 @@ import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UExpressionList
 import org.jetbrains.uast.UField
+import org.jetbrains.uast.UForEachExpression
 import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.ULocalVariable
 import org.jetbrains.uast.UPolyadicExpression
@@ -92,7 +93,7 @@ abstract class DataFlowVisitor(
         }
     }
 
-    private fun includeNode(node: UExpression?): Boolean {
+    protected fun includeNode(node: UExpression?): Boolean {
         node ?: return false
 
         fun isLightMethodButNotConstructor(psi: PsiElement): Boolean {
@@ -292,6 +293,37 @@ abstract class DataFlowVisitor(
                     returns(node)
                 }
             }
+        }
+    }
+
+    private val blockScopeVariable = mutableMapOf<UBlockExpression,
+        Triple<List<UElement>, List<PsiElement>, List<String>>>()
+
+    override fun visitBlockExpression(node: UBlockExpression): Boolean {
+        val parent = node.uastParent
+        (parent as? UForEachExpression)?.let {
+            if (includeNode(parent.iteratedValue)) {
+                val forEachValue = parent.variable
+
+                val ins = listOf(forEachValue).also {
+                    this.instances.addAll(it)
+                }
+                val ref = listOfNotNull(forEachValue.sourcePsi, forEachValue.javaPsi).also {
+                    this.references.addAll(it)
+                }
+                val prop = emptyList<String>()
+
+                blockScopeVariable[node] = Triple(ins, ref, prop)
+            }
+        }
+        return super.visitBlockExpression(node)
+    }
+
+    override fun afterVisitBlockExpression(node: UBlockExpression) {
+        blockScopeVariable[node]?.let { (ins, ref, prop) ->
+            this.instances.removeAll(ins)
+            this.references.removeAll(ref)
+            this.properties.removeAll(prop)
         }
     }
 

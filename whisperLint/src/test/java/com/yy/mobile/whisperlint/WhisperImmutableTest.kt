@@ -305,6 +305,26 @@ class WhisperImmutableTest {
             """.trimIndent()))
             .detector(WhisperImmutableDetector())
             .run()
-            .expect("")
+            .expect("src/aa/A.java:15: Error: you cannot invoke the [setValue(\"asd\")] method on an immutable object. [ImmutableObject]\n" +
+                "                entry.setValue(\"asd\"); //should lint\n" +
+                "                ~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:23: Error: you cannot invoke the [add(\"asd\")] method on an immutable object. [ImmutableObject]\n" +
+                "            collection.add(\"asd\"); //should lint\n" +
+                "            ~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:28: Error: you cannot invoke the [remove()] method on an immutable object. [ImmutableObject]\n" +
+                "                it.remove(); //should lint\n" +
+                "                ~~~~~~~~~~~\n" +
+                "    src/aa/A.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:13: Error: you cannot invoke the [putAll(Collections.unmodifiableMap(Collections.emptyMap()))] method on an immutable object. [ImmutableObject]\n" +
+                "        map.putAll(Collections.unmodifiableMap(\n" +
+                "        ^\n" +
+                "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:18: Error: you cannot invoke the [remove(3)] method on an immutable object. [ImmutableObject]\n" +
+                "        map.subMap(1, 10).remove(3); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
+                "5 errors, 0 warnings")
     }
 }
