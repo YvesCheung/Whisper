@@ -2,9 +2,10 @@ package aa;
 
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Created by 张宇 on 2018/9/10.
@@ -14,21 +15,26 @@ import java.util.List;
 public class A {
 
     @Immutable
-    private List<String> list = new ArrayList<>();
+    private Map<String, String> map = new LinkedHashMap<>();
 
     public void a() {
-        list.add("haha");
+        for (Map.Entry<String, String> entry : map.entrySet()) {
+            if (entry.getKey().equals(entry.getValue())) {
+                entry.setValue("asd"); //should lint
+            }
+        }
+    }
 
-        list.remove("haha");
-
-        list.addAll(Collections.singleton("haha"));
-
-        list.removeAll(Collections.singleton("haha"));
-
-        list.clear();
-
-        list.retainAll(Collections.singleton("haha"));
-
-        list.iterator().remove();
+    public void b() {
+        Collection<String> collection = map.values();
+        if (collection.isEmpty()) {
+            collection.add("asd"); //should lint
+        }
+        Iterator<String> it = collection.iterator();
+        while (it.hasNext()) {
+            if (it.next().equals("haha")) {
+                it.remove();
+            }
+        }
     }
 }

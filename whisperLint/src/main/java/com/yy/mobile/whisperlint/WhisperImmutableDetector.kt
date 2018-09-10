@@ -16,12 +16,9 @@ import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
-import org.jetbrains.uast.UField
 import org.jetbrains.uast.asRecursiveLogString
-import org.jetbrains.uast.getContainingClass
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
-import org.jetbrains.uast.tryResolve
 import java.util.*
 
 /**
@@ -36,10 +33,11 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         val ISSUE_WHISPER_IMMUTABLE: Issue = Issue.create(
             "ImmutableObject",
             "The reference annotated by @Immutable should not be modified.",
-            "aaa",
+            "Iterator, Entry, Collection, Map that annotated by @Immutable cannot be " +
+                "modified.",
             Category.CORRECTNESS,
-            10,
-            Severity.WARNING,
+            7,
+            Severity.ERROR,
             Implementation(
                 WhisperImmutableDetector::class.java,
                 EnumSet.of(Scope.JAVA_FILE)
@@ -49,7 +47,25 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
         fun getIssue() = arrayOf(ISSUE_WHISPER_IMMUTABLE)
 
-        private val collectionMethod = setOf(
+        private val checkReturnMethods = setOf(
+            "iterator",
+            "listIterator",
+            "getIterator",
+            "descendingIterator",
+            "subSet",
+            "subList",
+            "subMap",
+            "keySet",
+            "entrySet",
+            "values",
+            "headMap",
+            "tailMap",
+            "headSet",
+            "tailSet")
+
+        private const val collectionCls = "java.util.Collection"
+
+        private val collectionMethods = setOf(
             "add",
             "addAll",
             "remove",
@@ -57,6 +73,75 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             "removeIf",
             "retainAll",
             "clear"
+        )
+
+        private const val listCls = "java.util.List"
+
+        private val listMethods = setOf(
+            "set",
+            "removeRange",
+            "replaceAll",
+            "sort"
+        )
+
+        private const val queCls = "java.util.Queue"
+
+        private val queMethods = setOf(
+            "addFirst",
+            "addLast",
+            "offer",
+            "offerFirst",
+            "offerLast",
+            "removeFirst",
+            "removeLast",
+            "poll",
+            "pollFirst",
+            "pollLast",
+            "removeFirstOccurrence",
+            "removeLastOccurrence",
+            "push",
+            "pop"
+        )
+
+        private const val vectorCls = "java.util.Vector"
+
+        private val vectorAndStackMethods = setOf(
+            "push",
+            "pop",
+            "addElement",
+            "removeElement",
+            "removeAllElements",
+            "insertElementAt",
+            "removeElementAt"
+        )
+
+        private const val mapCls = "java.util.Map"
+
+        private val mapMathods = setOf(
+            "put",
+            "putAll",
+            "putIfAbsent",
+            "remove",
+            "merge",
+            "replace",
+            "replaceAll",
+            "pollFirstEntry",
+            "pollLastEntry",
+            "clear"
+        )
+
+        private const val iteratorCls = "java.util.Iterator"
+
+        private val iteratorMethods = setOf(
+            "remove",
+            "set",
+            "add"
+        )
+
+        private const val entryCls = "java.util.Map.Entry"
+
+        private val entryMethods = setOf(
+            "setValue"
         )
     }
 
@@ -96,35 +181,75 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         val scope = usage.getContainingUClass()
             ?: usage.getContainingUFile() ?: return
 
-        if (type == AnnotationUsageType.ASSIGNMENT) {
-            val availableReturn = exp.getAvailableReturnReference()
-            val references = availableReturn.mapNotNull { it.tryResolve() }
-            val properties = availableReturn.mapNotNull { (it as? UField)?.text }
-            val instances = listOf(usage)
+        if (type == AnnotationUsageType.ASSIGNMENT ||
+            type == AnnotationUsageType.METHOD_CALL) {
 
-            System.out.println(
-                "reference = ${references.joinToString { it.text }}\n" +
-                    "properties = $properties\n" +
-                    "instances = ${instances.joinToString { it.asSourceString() }}"
-            )
-
-            var match = false
+            val (instances, references, properties) = exp.getAvailableReturnValue()
 
             scope.accept(object : DataFlowVisitor(instances, references, properties) {
 
-                override fun visitElement(node: UElement) = match || super.visitElement(node)
-
                 override fun receiver(call: UCallExpression) {
-                    System.out.println("receiver = $call class = ${call.getContainingClass()}")
-                    if (collectionMethod.contains(getMethodName(call))) {
+                    System.out.println("receiver = $call class = ${call.resolve()?.containingClass}")
+
+                    if (checkReturnMethods.contains(getMethodName(call))) {
+                        val (iteIns, iteRef, iteProp) = call.getAvailableReturnValue()
+                        this.instances.addAll(iteIns)
+                        this.references.addAll(iteRef)
+                        this.properties.addAll(iteProp)
+
+                    } else if (isCollectionMethod(call, context) ||
+                        isIteratorMethod(call, context) ||
+                        isEntryMethod(call, context) ||
+                        isListMethod(call, context) ||
+                        isMapMethod(call, context) ||
+                        isQueueMethod(call, context) ||
+                        isVetorOrStackMethod(call, context)) {
+
+                        val mainMsg = "you cannot invoke the [$call] method on an immutable object."
+                        val referenceMsg = "This reference is annotated by @Immutable"
+                        val referenceLocation = context.getLocation(usage)
                         context.report(
                             ISSUE_WHISPER_IMMUTABLE,
                             call,
-                            context.getLocation(call),
-                            "immutable object")
+                            context.getLocation(call).withSecondary(referenceLocation, referenceMsg),
+                            mainMsg)
                     }
                 }
             })
         }
+    }
+
+    private fun isEntryMethod(call: UCallExpression, context: JavaContext) =
+        call.isMethodOf(context, entryMethods, entryCls)
+
+    private fun isMapMethod(call: UCallExpression, context: JavaContext) =
+        call.isMethodOf(context, mapMathods, mapCls)
+
+    private fun isVetorOrStackMethod(call: UCallExpression, context: JavaContext) =
+        call.isMethodOf(context, vectorAndStackMethods, vectorCls)
+
+    private fun isQueueMethod(call: UCallExpression, context: JavaContext) =
+        call.isMethodOf(context, queMethods, queCls)
+
+    private fun isListMethod(call: UCallExpression, context: JavaContext) =
+        call.isMethodOf(context, listMethods, listCls)
+
+    private fun isCollectionMethod(call: UCallExpression, context: JavaContext) =
+        call.isMethodOf(context, collectionMethods, collectionCls)
+
+    private fun isIteratorMethod(call: UCallExpression, context: JavaContext) =
+        call.isMethodOf(context, iteratorMethods, iteratorCls)
+
+    private fun UCallExpression.isMethodOf(
+        context: JavaContext,
+        names: Collection<String>,
+        clsName: String
+    ): Boolean {
+        if (names.contains(getMethodName(this))) {
+            val method = this.resolve()
+            return method != null &&
+                context.evaluator.isMemberInSubClassOf(method, clsName, false)
+        }
+        return false
     }
 }

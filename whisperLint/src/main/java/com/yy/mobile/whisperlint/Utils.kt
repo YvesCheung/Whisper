@@ -1,10 +1,12 @@
 package com.yy.mobile.whisperlint
 
 import com.android.tools.lint.detector.api.getMethodName
+import com.intellij.psi.PsiElement
 import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
+import org.jetbrains.uast.UField
 import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
@@ -66,7 +68,7 @@ fun UCallExpression.getAvailableCaller(): List<UElement> {
     return result
 }
 
-fun UExpression.getAvailableReturnReference(): List<UElement> {
+fun UExpression.getAvailableReturnValue(): Triple<List<UElement>, List<PsiElement>, List<String>> {
     val result = mutableListOf<UElement>()
     val qualified: UExpression? = this.getOutermostQualified()
         ?: this as? UCallExpression
@@ -85,5 +87,16 @@ fun UExpression.getAvailableReturnReference(): List<UElement> {
             result.add(declareExpect)
         }
     }
-    return result
+
+    val references = result.mapNotNull { it.tryResolve() }
+    val properties = result.mapNotNull { (it as? UField)?.text }
+    val instances = mutableListOf(this)
+
+    val methodCall = this.uastParent
+    if (methodCall is UQualifiedReferenceExpression &&
+        methodCall.selector == this) {
+        instances.add(methodCall)
+    }
+
+    return Triple(instances, references, properties)
 }

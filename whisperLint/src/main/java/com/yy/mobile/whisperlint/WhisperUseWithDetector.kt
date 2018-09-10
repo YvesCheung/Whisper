@@ -16,7 +16,6 @@ import com.intellij.psi.PsiPrimitiveType
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
-import org.jetbrains.uast.UField
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.evaluateString
 import org.jetbrains.uast.getContainingUClass
@@ -203,10 +202,7 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
             if (methods != null && methods.isNotEmpty()) {
                 // the method belongs to return type
                 // so find the clean up method that belongs to the return type
-                val availableReturn = call.getAvailableReturnReference()
-                val references = availableReturn.mapNotNull { it.tryResolve() }
-                val properties = availableReturn.mapNotNull { (it as? UField)?.text }
-                val elements = listOf(usage)
+                val (elements, references, properties) = call.getAvailableReturnValue()
                 match = findCleanUpMethod(scope, useWithStr, methodReturnClass,
                     elements, references, properties)
             }
