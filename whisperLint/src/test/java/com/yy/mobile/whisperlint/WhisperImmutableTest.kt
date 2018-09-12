@@ -571,6 +571,10 @@ class WhisperImmutableTest {
                 "        ~~~~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/A.java:13: This reference is annotated by @Immutable\n" +
                 "2 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 8: Annotate [list] with @Immutable:\n" +
+                "@@ -8 +8\n" +
+                "-     private List<String> list; //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private List<String> list; //should lint")
     }
 
     @Test
@@ -644,5 +648,13 @@ class WhisperImmutableTest {
                 "        ~~~~~~~~~~~\n" +
                 "    src/aa/B.java:11: This reference is annotated by @Immutable\n" +
                 "3 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 9: Annotate [set] with @Immutable:\n" +
+                "@@ -9 +9\n" +
+                "-     private Set<String> set; //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private Set<String> set; //should lint\n" +
+                "Fix for src/aa/B.java line 9: Annotate [newSet] with @Immutable:\n" +
+                "@@ -9 +9\n" +
+                "-     private Set<String> newSet; //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private Set<String> newSet; //should lint")
     }
 }

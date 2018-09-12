@@ -7,6 +7,7 @@ import com.android.tools.lint.detector.api.Detector
 import com.android.tools.lint.detector.api.Implementation
 import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
+import com.android.tools.lint.detector.api.LintFix
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.getMethodName
@@ -282,11 +283,21 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                     "to a mutable field [${field.name}]."
                 val referenceMsg = "This expression [$assignMsg] is immutable."
                 val referenceLocation = context.getLocation(assignment)
+                val fieldLocation = context.getLocation(field)
+                val quickFix = LintFix.create()
+                    .name("Annotate [${field.name}] with @Immutable")
+                    .replace()
+                    .range(fieldLocation)
+                    .with("@$immutableAnnotation ${field.text}")
+                    .shortenNames()
+                    .reformat(true)
+                    .build()
                 context.report(
                     ISSUE_WHISPER_MISSING_IMMUTABLE,
                     field,
-                    context.getLocation(field).withSecondary(referenceLocation, referenceMsg),
-                    mainMsg)
+                    fieldLocation.withSecondary(referenceLocation, referenceMsg),
+                    mainMsg,
+                    quickFix)
             }
         })
     }
