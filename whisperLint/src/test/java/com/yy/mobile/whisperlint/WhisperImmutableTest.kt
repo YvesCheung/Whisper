@@ -329,6 +329,96 @@ class WhisperImmutableTest {
     }
 
     @Test
+    fun `Check Java local @Immutable map and modify`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    public void a() {
+
+                        @Immutable
+                        Map<String, String> map = new LinkedHashMap<>();
+
+                        for (Map.Entry<String, String> entry : map.entrySet()) {
+                            if (entry.getKey().equals(entry.getValue())) {
+                                entry.setValue("asd"); //should lint
+                            }
+                        }
+
+                        Collection<String> collection = map.values();
+                        if (collection.isEmpty()) {
+                            collection.add("asd"); //should lint
+                        }
+                        Iterator<String> it = collection.iterator();
+                        while (it.hasNext()) {
+                            if (it.next().equals("haha")) {
+                                it.remove(); //should lint
+                            }
+                        }
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B {
+
+                    public void a() {
+
+                        @Immutable
+                        TreeMap<Integer, String> map = new TreeMap<>();
+
+                        map.putAll(Collections.unmodifiableMap(
+                                Collections.<Integer, String>emptyMap())); //should lint
+
+                        map.subMap(1, 10).remove(3); //should lint
+
+                        if (map.containsKey(3)) {
+                            for (Integer a : map.keySet()) {
+                                String value = map.get(a);
+                            }
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:16: Error: you cannot invoke the [setValue(\"asd\")] method on an immutable object. [ImmutableObject]\n" +
+                "                entry.setValue(\"asd\"); //should lint\n" +
+                "                ~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:12: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:22: Error: you cannot invoke the [add(\"asd\")] method on an immutable object. [ImmutableObject]\n" +
+                "            collection.add(\"asd\"); //should lint\n" +
+                "            ~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:12: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:27: Error: you cannot invoke the [remove()] method on an immutable object. [ImmutableObject]\n" +
+                "                it.remove(); //should lint\n" +
+                "                ~~~~~~~~~~~\n" +
+                "    src/aa/A.java:12: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:14: Error: you cannot invoke the [putAll(Collections.unmodifiableMap(Collections.emptyMap()))] method on an immutable object. [ImmutableObject]\n" +
+                "        map.putAll(Collections.unmodifiableMap(\n" +
+                "        ^\n" +
+                "    src/aa/B.java:12: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:17: Error: you cannot invoke the [remove(3)] method on an immutable object. [ImmutableObject]\n" +
+                "        map.subMap(1, 10).remove(3); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:12: This reference is annotated by @Immutable\n" +
+                "5 errors, 0 warnings")
+    }
+
+    @Test
     fun `Check Java field @Immutable set and modify`() {
 
         TestLintTask.lint().files(
