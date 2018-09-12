@@ -51,7 +51,7 @@ abstract class DataFlowVisitor(
     open fun returns(expression: UReturnExpression) {}
 
     /** The instance being tracked is being stored into a field */
-    open fun field(field: UElement) {}
+    open fun field(assignment: UElement, field: PsiField) {}
 
     /** The instance being tracked is being passed in a method call */
     open fun argument(
@@ -277,7 +277,7 @@ abstract class DataFlowVisitor(
                 is KtLightMethod -> properties.add(lhs.text)
                 is UVariable -> addVariableReference(lhs)
                 is PsiLocalVariable -> references.add(lhs)
-                is PsiField -> field(rhs)
+                is PsiField -> field(rhs, lhs)
             }
         }
     }

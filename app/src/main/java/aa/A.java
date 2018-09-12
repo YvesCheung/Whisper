@@ -3,8 +3,8 @@ package aa;
 import com.yy.mobile.whisper.Immutable;
 
 import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Created by 张宇 on 2018/9/10.
@@ -13,25 +13,16 @@ import java.util.concurrent.LinkedBlockingDeque;
  */
 public class A {
 
-    @Immutable
-    private LinkedBlockingDeque<Long> que = new LinkedBlockingDeque<>();
+    private List<String> list; //should lint
 
     public void a() {
-        que.drainTo(new ArrayList<Long>()); //should lint
 
-        try {
-            que.putLast(3L); //should lint
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
+        @Immutable
+        List<String> localList = new ArrayList<>(Collections.singleton("haha"));
 
-    public void b() {
-        Iterator<Long> it = que.descendingIterator();
-        for (; it.hasNext(); ) {
-            if (it.next() > 3L) {
-                it.remove(); //should lint
-            }
-        }
+        localList.add("haha2"); //should lint
+
+        list = localList;
+        list.add("haha3"); //no necessary lint
     }
 }

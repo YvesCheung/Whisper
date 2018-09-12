@@ -532,4 +532,117 @@ class WhisperImmutableTest {
                 "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
                 "7 errors, 0 warnings")
     }
+
+    @Test
+    fun `Check Java local @Immutable to mutable field`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+                    private List<String> list; //should lint
+
+                    public void a() {
+
+                        @Immutable
+                        List<String> localList = new ArrayList<>(Collections.singleton("haha"));
+
+                        localList.add("haha2"); //should lint
+
+                        list = localList;
+                        list.add("haha3"); //no necessary lint
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:8: Error: Unable to assign an immutable object [localList] to a mutable field [list]. [ImmutableEscape]\n" +
+                "    private List<String> list; //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:17: This expression [localList] is immutable.\n" +
+                "src/aa/A.java:15: Error: you cannot invoke the [add(\"haha2\")] method on an immutable object. [ImmutableObject]\n" +
+                "        localList.add(\"haha2\"); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:13: This reference is annotated by @Immutable\n" +
+                "2 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check Java local @Immutable to mutable field and fix`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    private Set<String> set; //should lint
+
+                    public void a() {
+
+                        @Immutable
+                        HashSet<String> localSet = new HashSet<>();
+
+                        HashSet<String> localSet2 = localSet;
+
+                        set = localSet;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B {
+
+                    private Set<String> newSet; //should lint
+
+                    @Immutable
+                    private Set<String> set;
+
+                    public void a() {
+
+                        set = new HashSet<>();
+                        set.clear();
+
+                        newSet = set;
+                    }
+
+                    public void b() {
+
+                        newSet.clear();
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("" +
+                "src/aa/A.java:9: Error: Unable to assign an immutable object [localSet] to a mutable field [set]. [ImmutableEscape]\n" +
+                "    private Set<String> set; //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:18: This expression [localSet] is immutable.\n" +
+                "src/aa/B.java:9: Error: Unable to assign an immutable object [set] to a mutable field [newSet]. [ImmutableEscape]\n" +
+                "    private Set<String> newSet; //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:19: This expression [set] is immutable.\n" +
+                "src/aa/B.java:17: Error: you cannot invoke the [clear()] method on an immutable object. [ImmutableObject]\n" +
+                "        set.clear();\n" +
+                "        ~~~~~~~~~~~\n" +
+                "    src/aa/B.java:11: This reference is annotated by @Immutable\n" +
+                "3 errors, 0 warnings")
+    }
 }

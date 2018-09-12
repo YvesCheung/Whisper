@@ -2,28 +2,19 @@ package aa;
 
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.Collections;
-import java.util.TreeMap;
+import java.util.*;
 
 public class B {
 
+    private Set<String> newSet; //should lint
+
     @Immutable
-    private TreeMap<Integer, String> map = new TreeMap<>();
+    private Set<String> set;
 
     public void a() {
-        map.putAll(Collections.unmodifiableMap(
-                Collections.<Integer, String>emptyMap())); //should lint
-    }
 
-    public void b() {
-        map.subMap(1, 10).remove(3); //should lint
-    }
+        set = new HashSet<>();
 
-    public void c() {
-        if (map.containsKey(3)) {
-            for (Integer a : map.keySet()) {
-                String value = map.get(a);
-            }
-        }
+        newSet = set;
     }
 }

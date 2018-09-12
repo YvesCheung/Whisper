@@ -14,6 +14,7 @@ import java.lang.annotation.Target;
 @Documented
 @Target({ElementType.FIELD,
         ElementType.METHOD,
+        ElementType.LOCAL_VARIABLE,
         ElementType.PARAMETER})
 @Retention(RetentionPolicy.SOURCE)
 public @interface Immutable {

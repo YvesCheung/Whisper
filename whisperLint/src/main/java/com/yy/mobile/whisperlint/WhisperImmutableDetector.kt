@@ -10,12 +10,15 @@ import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.getMethodName
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
+import org.jetbrains.uast.UField
 import org.jetbrains.uast.asRecursiveLogString
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
@@ -35,6 +38,18 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             "The reference annotated by @Immutable should not be modified.",
             "Iterator, Entry, Collection, Map that annotated by @Immutable cannot be " +
                 "modified.",
+            Category.CORRECTNESS,
+            7,
+            Severity.ERROR,
+            Implementation(
+                WhisperImmutableDetector::class.java,
+                EnumSet.of(Scope.JAVA_FILE)
+            ))
+
+        val ISSUE_WHISPER_MISSING_IMMUTABLE: Issue = Issue.create(
+            "ImmutableEscape",
+            "The reference annotated by @Immutable has escaped.",
+            "Can not assign an immutable object to a mutable object.",
             Category.CORRECTNESS,
             7,
             Severity.ERROR,
@@ -149,7 +164,9 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         )
     }
 
-    override fun getApplicableUastTypes(): List<Class<out UElement>> = listOf(UClass::class.java)
+    override fun getApplicableUastTypes(): List<Class<out UElement>> = listOf(
+        UClass::class.java,
+        UField::class.java)
 
     override fun createUastHandler(context: JavaContext): UElementHandler? {
         return object : UElementHandler() {
@@ -157,15 +174,32 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             override fun visitClass(node: UClass) {
                 System.out.println(node.asRecursiveLogString())
             }
+
+            override fun visitField(node: UField) {
+                //if uastInitializer is not null,
+                //`visitAnnotationUsage` for type ASSIGNMENT will be invoked
+                //todo: by lazy
+                if (node.uastInitializer == null &&
+                    node.annotations.find { it.qualifiedName == immutableAnnotation } != null) {
+                    val scope = node.getContainingUClass() ?: return
+                    val instances = listOf(node)
+                    val references = listOfNotNull(node.sourcePsi, node.javaPsi)
+                    val properties = listOfNotNull(node.text)
+                    deepSearchUsage(context, node, scope,
+                        instances = instances,
+                        references = references,
+                        properties = properties)
+                }
+            }
         }
     }
 
     override fun applicableAnnotations() = listOf(immutableAnnotation)
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-//        return type == AnnotationUsageType.VARIABLE_REFERENCE ||
-//            type == AnnotationUsageType.METHOD_CALL
-        return super.isApplicableAnnotationUsage(type)
+        return type == AnnotationUsageType.ASSIGNMENT ||
+            type == AnnotationUsageType.METHOD_CALL_PARAMETER ||
+            type == AnnotationUsageType.METHOD_CALL
     }
 
     override fun visitAnnotationUsage(
@@ -180,47 +214,81 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         allClassAnnotations: List<UAnnotation>,
         allPackageAnnotations: List<UAnnotation>
     ) {
-        val exp = usage as? UExpression ?: return
+        usage as? UExpression ?: return
 
-        val scope = usage.getContainingUClass()
-            ?: usage.getContainingUFile() ?: return
+        if (type != AnnotationUsageType.METHOD_CALL_PARAMETER) {
 
-        if (type == AnnotationUsageType.ASSIGNMENT ||
-            type == AnnotationUsageType.METHOD_CALL) {
+            val scope = usage.getContainingUClass()
+                ?: usage.getContainingUFile() ?: return
 
-            val (instances, references, properties) = exp.getAvailableReturnValue()
+            val (instances, references, properties) = usage.getAvailableReturnValue()
 
-            scope.accept(object : DataFlowVisitor(instances, references, properties) {
-
-                override fun receiver(call: UCallExpression) {
-                    System.out.println("receiver = $call class = ${call.resolve()?.containingClass}")
-
-                    if (checkReturnMethods.contains(getMethodName(call))) {
-                        val (iteIns, iteRef, iteProp) = call.getAvailableReturnValue()
-                        this.instances.addAll(iteIns)
-                        this.references.addAll(iteRef)
-                        this.properties.addAll(iteProp)
-
-                    } else if (isCollectionMethod(call, context) ||
-                        isIteratorMethod(call, context) ||
-                        isEntryMethod(call, context) ||
-                        isListMethod(call, context) ||
-                        isMapMethod(call, context) ||
-                        isQueueMethod(call, context) ||
-                        isVetorOrStackMethod(call, context)) {
-
-                        val mainMsg = "you cannot invoke the [$call] method on an immutable object."
-                        val referenceMsg = "This reference is annotated by @Immutable"
-                        val referenceLocation = context.getLocation(usage)
-                        context.report(
-                            ISSUE_WHISPER_IMMUTABLE,
-                            call,
-                            context.getLocation(call).withSecondary(referenceLocation, referenceMsg),
-                            mainMsg)
-                    }
-                }
-            })
+            deepSearchUsage(context, usage, scope, instances, references, properties)
         }
+    }
+
+    private fun deepSearchUsage(
+        context: JavaContext,
+        usage: UElement,
+        scope: UElement,
+        instances: List<UElement> = emptyList(),
+        references: List<PsiElement> = emptyList(),
+        properties: List<String> = emptyList()
+    ) {
+        scope.accept(object : DataFlowVisitor(instances, references, properties) {
+
+            private var abort = false
+
+            override fun visitElement(node: UElement) = abort || super.visitElement(node)
+
+            override fun receiver(call: UCallExpression) {
+                System.out.println("receiver = $call class = ${call.resolve()?.containingClass}")
+
+                if (checkReturnMethods.contains(getMethodName(call))) {
+                    val (iteIns, iteRef, iteProp) = call.getAvailableReturnValue()
+                    this.instances.addAll(iteIns)
+                    this.references.addAll(iteRef)
+                    this.properties.addAll(iteProp)
+
+                } else if (isCollectionMethod(call, context) ||
+                    isIteratorMethod(call, context) ||
+                    isEntryMethod(call, context) ||
+                    isListMethod(call, context) ||
+                    isMapMethod(call, context) ||
+                    isQueueMethod(call, context) ||
+                    isVectorOrStackMethod(call, context)) {
+
+                    val mainMsg = "you cannot invoke the [$call] method on an immutable object."
+                    val referenceMsg = "This reference is annotated by @Immutable"
+                    val referenceLocation = context.getLocation(usage)
+                    context.report(
+                        ISSUE_WHISPER_IMMUTABLE,
+                        call,
+                        context.getLocation(call).withSecondary(referenceLocation, referenceMsg),
+                        mainMsg)
+                }
+            }
+
+            override fun field(assignment: UElement, field: PsiField) {
+                System.out.println("field = $field assign = ${assignment.asSourceString()}")
+                val isImmutable = field.annotations
+                    .find { it.qualifiedName == immutableAnnotation }
+                if (isImmutable != null) {
+                    return
+                }
+                abort = true
+                val assignMsg = assignment.asSourceString()
+                val mainMsg = "Unable to assign an immutable object [$assignMsg] " +
+                    "to a mutable field [${field.name}]."
+                val referenceMsg = "This expression [$assignMsg] is immutable."
+                val referenceLocation = context.getLocation(assignment)
+                context.report(
+                    ISSUE_WHISPER_MISSING_IMMUTABLE,
+                    field,
+                    context.getLocation(field).withSecondary(referenceLocation, referenceMsg),
+                    mainMsg)
+            }
+        })
     }
 
     private fun isEntryMethod(call: UCallExpression, context: JavaContext) =
@@ -229,7 +297,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
     private fun isMapMethod(call: UCallExpression, context: JavaContext) =
         call.isMethodOf(context, mapMathods, mapCls)
 
-    private fun isVetorOrStackMethod(call: UCallExpression, context: JavaContext) =
+    private fun isVectorOrStackMethod(call: UCallExpression, context: JavaContext) =
         call.isMethodOf(context, vectorAndStackMethods, vectorCls)
 
     private fun isQueueMethod(call: UCallExpression, context: JavaContext) =
