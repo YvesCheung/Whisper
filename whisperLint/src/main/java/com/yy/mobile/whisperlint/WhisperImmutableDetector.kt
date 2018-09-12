@@ -14,15 +14,21 @@ import com.android.tools.lint.detector.api.getMethodName
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiModifierListOwner
+import com.intellij.psi.PsiVariable
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UField
+import org.jetbrains.uast.UQualifiedReferenceExpression
+import org.jetbrains.uast.USimpleNameReferenceExpression
 import org.jetbrains.uast.asRecursiveLogString
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
+import org.jetbrains.uast.getContainingUMethod
+import org.jetbrains.uast.tryResolve
 import java.util.*
 
 /**
@@ -177,10 +183,12 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             }
 
             override fun visitField(node: UField) {
+
+                val initializer = node.uastInitializer
                 //if uastInitializer is not null,
-                //`visitAnnotationUsage` for type ASSIGNMENT will be invoked
+                //`visitAnnotationUsage` for type ASSIGNMENT will be invoked.
                 //todo: by lazy
-                if (node.uastInitializer == null &&
+                if (initializer == null &&
                     node.annotations.find { it.qualifiedName == immutableAnnotation } != null) {
                     val scope = node.getContainingUClass() ?: return
                     val instances = listOf(node)
@@ -190,6 +198,15 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                         instances = instances,
                         references = references,
                         properties = properties)
+                }
+                //if the field does not annotated by @Immutable
+                //check whether the initializer is mutable.
+                else if (initializer != null &&
+                    node.annotations.find { it.qualifiedName == immutableAnnotation } == null) {
+
+                    if (checkIsImmutable(initializer)) {
+                        reportField(context, initializer, node)
+                    }
                 }
             }
         }
@@ -219,8 +236,17 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
         if (type != AnnotationUsageType.METHOD_CALL_PARAMETER) {
 
-            val scope = usage.getContainingUClass()
-                ?: usage.getContainingUFile() ?: return
+            val scope: UElement = usage.getContainingUMethod() as? UElement
+                ?: usage.getContainingUClass()
+                ?: usage.getContainingUFile()
+                ?: return
+
+//            if (scope !is UMethod) {
+//                val field = usage.getContainingUVariable() as? UField
+//                if (field != null && !checkIsImmutable(field as PsiModifierListOwner)) {
+//                    reportField(context, usage, field)
+//                }
+//            }
 
             val (instances, references, properties) = usage.getAvailableReturnValue()
 
@@ -272,34 +298,63 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
             override fun field(assignment: UElement, field: PsiField) {
                 System.out.println("field = $field assign = ${assignment.asSourceString()}")
-                val isImmutable = field.annotations
-                    .find { it.qualifiedName == immutableAnnotation }
-                if (isImmutable != null) {
-                    return
+                if (!checkIsImmutable(field)) {
+                    abort = true
+                    reportField(context, assignment, field)
                 }
-                abort = true
-                val assignMsg = assignment.asSourceString()
-                val mainMsg = "Unable to assign an immutable object [$assignMsg] " +
-                    "to a mutable field [${field.name}]."
-                val referenceMsg = "This expression [$assignMsg] is immutable."
-                val referenceLocation = context.getLocation(assignment)
-                val fieldLocation = context.getLocation(field)
-                val quickFix = LintFix.create()
-                    .name("Annotate [${field.name}] with @Immutable")
-                    .replace()
-                    .range(fieldLocation)
-                    .with("@$immutableAnnotation ${field.text}")
-                    .shortenNames()
-                    .reformat(true)
-                    .build()
-                context.report(
-                    ISSUE_WHISPER_MISSING_IMMUTABLE,
-                    field,
-                    fieldLocation.withSecondary(referenceLocation, referenceMsg),
-                    mainMsg,
-                    quickFix)
             }
         })
+    }
+
+    private fun reportField(
+        context: JavaContext,
+        assignment: UElement,
+        field: PsiField
+    ) {
+        val assignMsg = assignment.asSourceString()
+        val mainMsg = "Unable to assign an immutable object [$assignMsg] " +
+            "to a mutable field [${field.name}]."
+        val referenceMsg = "This expression [$assignMsg] is immutable."
+        val referenceLocation = context.getLocation(assignment)
+        val fieldLocation = context.getLocation(field)
+        val quickFix = LintFix.create()
+            .name("Annotate [${field.name}] with @Immutable")
+            .replace()
+            .range(fieldLocation)
+            .with("@$immutableAnnotation ${field.text}")
+            .shortenNames()
+            .reformat(true)
+            .build()
+        context.report(
+            ISSUE_WHISPER_MISSING_IMMUTABLE,
+            field,
+            fieldLocation.withSecondary(referenceLocation, referenceMsg),
+            mainMsg,
+            quickFix)
+    }
+
+    private fun checkIsImmutable(element: UElement): Boolean {
+        if (element is UCallExpression) {
+            val method = element.resolve()
+            if (method != null && checkIsImmutable(method)) {
+                return true
+            }
+        } else if (element is UQualifiedReferenceExpression) {
+            return checkIsImmutable(element.selector)
+        } else if (element is USimpleNameReferenceExpression) {
+            val variable = element.tryResolve() as? PsiVariable
+            if (variable != null && checkIsImmutable(variable)) {
+                return true
+            }
+        }
+        if (element is PsiModifierListOwner) {
+            return checkIsImmutable(element as PsiModifierListOwner)
+        }
+        return false
+    }
+
+    private fun checkIsImmutable(element: PsiModifierListOwner): Boolean {
+        return element.annotations.find { it.qualifiedName == immutableAnnotation } != null
     }
 
     private fun isEntryMethod(call: UCallExpression, context: JavaContext) =

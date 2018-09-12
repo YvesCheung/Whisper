@@ -747,4 +747,213 @@ class WhisperImmutableTest {
                 "-     private Set<String> newSet; //should lint\n" +
                 "+     @com.yy.mobile.whisper.Immutable private Set<String> newSet; //should lint")
     }
+
+    @Test
+    fun `Check Java method @Immutable to local`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    public Map<Long, String> a() {
+                        return new HashMap<Long, String>();
+                    }
+
+                    private void b() {
+                        Map<Long, String> local = a();
+
+                        Set<Long> keySet = local.keySet();
+                        keySet.clear(); //should lint
+
+                        for (Map.Entry<Long, String> entry : local.entrySet()) {
+                            entry.setValue("haha"); //should lint
+                        }
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B {
+
+                    public void a() {
+                        Map<Long, String> local = new A().a();
+
+                        local.putAll(Collections.singletonMap(4L, "ll")); //should lint
+                    }
+
+                    public void b() {
+                        new A().a().put(5L, "aa"); //should lint
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:18: Error: you cannot invoke the [clear()] method on an immutable object. [ImmutableObject]\n" +
+                "        keySet.clear(); //should lint\n" +
+                "        ~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:15: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:21: Error: you cannot invoke the [setValue(\"haha\")] method on an immutable object. [ImmutableObject]\n" +
+                "            entry.setValue(\"haha\"); //should lint\n" +
+                "            ~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:15: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:12: Error: you cannot invoke the [putAll(Collections.singletonMap(4, \"ll\"))] method on an immutable object. [ImmutableObject]\n" +
+                "        local.putAll(Collections.singletonMap(4L, \"ll\")); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:10: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:16: Error: you cannot invoke the [put(5, \"aa\")] method on an immutable object. [ImmutableObject]\n" +
+                "        new A().a().put(5L, \"aa\"); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:16: This reference is annotated by @Immutable\n" +
+                "4 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check Java method @Immutable to field`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    private Map<Long, String> field; //should lint
+
+                    @Immutable
+                    public Map<Long, String> a() {
+                        Map<Long, String> map = new HashMap<>();
+                        map.put(3L, "ahah");
+                        return map;
+                    }
+
+                    private void b() {
+                        field = a();
+
+                        Set<Long> keySet = field.keySet();
+                        keySet.clear();
+
+                        for (Map.Entry<Long, String> entry : field.entrySet()) {
+                            entry.setValue("haha");
+                        }
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B {
+
+                    public A getA() {
+                        return new A();
+                    }
+
+                    Map<Long, String> field = new B().getA().a(); //should lint
+
+                    public void a() {
+                        field.putAll(Collections.singletonMap(4L, "ll"));
+                    }
+
+                    public void b() {
+                        field.put(5L, "aa");
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:9: Error: Unable to assign an immutable object [a()] to a mutable field [field]. [ImmutableEscape]\n" +
+                "    private Map<Long, String> field; //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:19: This expression [a()] is immutable.\n" +
+                "src/aa/B.java:13: Error: Unable to assign an immutable object [new B().getA().a()] to a mutable field [field]. [ImmutableEscape]\n" +
+                "    Map<Long, String> field = new B().getA().a(); //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:13: This expression [new B().getA().a()] is immutable.\n" +
+                "src/aa/B.java:16: Error: you cannot invoke the [putAll(Collections.singletonMap(4, \"ll\"))] method on an immutable object. [ImmutableObject]\n" +
+                "        field.putAll(Collections.singletonMap(4L, \"ll\"));\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:13: This reference is annotated by @Immutable\n" +
+                "src/aa/B.java:20: Error: you cannot invoke the [put(5, \"aa\")] method on an immutable object. [ImmutableObject]\n" +
+                "        field.put(5L, \"aa\");\n" +
+                "        ~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:13: This reference is annotated by @Immutable\n" +
+                "4 errors, 0 warnings")
+            .expectFixDiffs("")
+    }
+
+    @Test
+    fun `Check Java field @Immutable to field`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    public final Map<Long, String> field;
+
+                    @Immutable
+                    public final Map<Long, String> field2 = new TreeMap<>();
+
+                    private Map<Long, String> field3 = field2; //should lint
+
+                    public A() {
+                        Map<Long, String> local = new HashMap<>();
+                        local.put(3L, "2");
+                        field = local;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B {
+
+                    public A getA() {
+                        return new A();
+                    }
+
+                    Map<Long, String> field = getA().field; //should lint
+
+                    Map<Long, String> field2 = getA().field2; //should lint
+
+                    public void a() {
+                        getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("")
+    }
 }

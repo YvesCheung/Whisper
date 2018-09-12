@@ -10,7 +10,7 @@ import org.jetbrains.uast.UField
 import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
-import org.jetbrains.uast.UVariable
+import org.jetbrains.uast.getContainingUVariable
 import org.jetbrains.uast.getOutermostQualified
 import org.jetbrains.uast.getParentOfType
 import org.jetbrains.uast.tryResolve
@@ -80,8 +80,7 @@ fun UExpression.getAvailableReturnValue(): Triple<List<UElement>, List<PsiElemen
             result.add(assignExpect.leftOperand)
         }
 
-        val declareExpect = qualified.getParentOfType<UVariable>(
-            UVariable::class.java, true)
+        val declareExpect = qualified.getContainingUVariable()
 
         if (declareExpect != null) {
             result.add(declareExpect)

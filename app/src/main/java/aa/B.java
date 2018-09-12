@@ -1,20 +1,19 @@
 package aa;
 
-import com.yy.mobile.whisper.Immutable;
-
-import java.util.*;
+import java.util.Collections;
+import java.util.Map;
 
 public class B {
 
-    private Set<String> newSet; //should lint
+    public A getA() {
+        return new A();
+    }
 
-    @Immutable
-    private Set<String> set;
+    Map<Long, String> field = getA().field; //should lint
+
+    Map<Long, String> field2 = getA().field2; //should lint
 
     public void a() {
-
-        set = new HashSet<>();
-
-        newSet = set;
+        getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
     }
 }
