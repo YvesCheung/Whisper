@@ -24,6 +24,7 @@ class WhisperImmutableTest {
                 @Documented
                 @Target({ElementType.FIELD,
                         ElementType.METHOD,
+                        ElementType.LOCAL_VARIABLE,
                         ElementType.PARAMETER})
                 @Retention(RetentionPolicy.SOURCE)
                 public @interface Immutable {
@@ -898,7 +899,14 @@ class WhisperImmutableTest {
                 "        ~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/B.java:13: This reference is annotated by @Immutable\n" +
                 "4 errors, 0 warnings")
-            .expectFixDiffs("")
+            .expectFixDiffs("Fix for src/aa/A.java line 9: Annotate [field] with @Immutable:\n" +
+                "@@ -9 +9\n" +
+                "-     private Map<Long, String> field; //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private Map<Long, String> field; //should lint\n" +
+                "Fix for src/aa/B.java line 13: Annotate [field] with @Immutable:\n" +
+                "@@ -13 +13\n" +
+                "-     Map<Long, String> field = new B().getA().a(); //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable Map<Long, String> field = new B().getA().a(); //should lint")
     }
 
     @Test
@@ -922,6 +930,13 @@ class WhisperImmutableTest {
                     public final Map<Long, String> field2 = new TreeMap<>();
 
                     private Map<Long, String> field3 = field2; //should lint
+
+                    public final Map<Long, String> field4 = new TreeMap<>();
+
+                    private Map<Long, String> field5 = field4; //should not lint
+
+                    @Immutable
+                    private Map<Long, String> field6 = field4; //should not lint
 
                     public A() {
                         Map<Long, String> local = new HashMap<>();
@@ -954,6 +969,480 @@ class WhisperImmutableTest {
             """.trimIndent()))
             .detector(WhisperImmutableDetector())
             .run()
-            .expect("")
+            .expect("src/aa/A.java:15: Error: Unable to assign an immutable object [field2] to a mutable field [field3]. [ImmutableEscape]\n" +
+                "    private Map<Long, String> field3 = field2; //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:15: This expression [field2] is immutable.\n" +
+                "src/aa/B.java:13: Error: Unable to assign an immutable object [getA().field] to a mutable field [field]. [ImmutableEscape]\n" +
+                "    Map<Long, String> field = getA().field; //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:13: This expression [getA().field] is immutable.\n" +
+                "src/aa/B.java:15: Error: Unable to assign an immutable object [getA().field2] to a mutable field [field2]. [ImmutableEscape]\n" +
+                "    Map<Long, String> field2 = getA().field2; //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:15: This expression [getA().field2] is immutable.\n" +
+                "src/aa/B.java:18: Error: you cannot invoke the [putAll(Collections.singletonMap(4, \"ll\"))] method on an immutable object. [ImmutableObject]\n" +
+                "        getA().field.putAll(Collections.singletonMap(4L, \"ll\")); //should lint\n" +
+                "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:9: This reference is annotated by @Immutable\n" +
+                "4 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 15: Annotate [field3] with @Immutable:\n" +
+                "@@ -15 +15\n" +
+                "-     private Map<Long, String> field3 = field2; //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private Map<Long, String> field3 = field2; //should lint\n" +
+                "Fix for src/aa/B.java line 13: Annotate [field] with @Immutable:\n" +
+                "@@ -13 +13\n" +
+                "-     Map<Long, String> field = getA().field; //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable Map<Long, String> field = getA().field; //should lint\n" +
+                "Fix for src/aa/B.java line 15: Annotate [field2] with @Immutable:\n" +
+                "@@ -15 +15\n" +
+                "-     Map<Long, String> field2 = getA().field2; //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable Map<Long, String> field2 = getA().field2; //should lint")
     }
+
+    @Test
+    fun `Check Java field @Immutable to method return`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    public final Map<Long, String> field;
+
+                    @Immutable
+                    final TreeMap<Long, String> field2 = new TreeMap<>();
+
+                    public final Map<Long, String> field3;
+
+                    final TreeMap<Long, String> field4 = new TreeMap<>();
+
+                    public A() {
+                        Map<Long, String> local = new HashMap<>();
+                        local.put(3L, "2");
+                        field = local;
+                        field3 = local;
+                    }
+
+                    public Map<Long, String> b() { //should lint
+                        return field;
+                    }
+
+                    protected TreeMap<Long, String> c() { //should lint
+                        return field2;
+                    }
+
+                    public Map<Long, String> d() { //should not lint
+                        return field3;
+                    }
+
+                    public Map<Long, String> e() { //should not lint
+                        return field4;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B extends A {
+
+                    public A getA() {
+                        return new A();
+                    }
+
+                    public Map<Long, String> f() { //should lint
+                        return getA().field;
+                    }
+
+                    public Map<Long, String> g() { //should lint
+                        return field2;
+                    }
+
+                    public Map<Long, String> h() { //should not lint
+                        return getA().field3;
+                    }
+
+                    public Map<Long, String> i() { //should not lint
+                        return field4;
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:26: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    public Map<Long, String> b() { //should lint\n" +
+                "                             ~\n" +
+                "    src/aa/A.java:27: This expression [return field;] is immutable.\n" +
+                "src/aa/A.java:30: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    protected TreeMap<Long, String> c() { //should lint\n" +
+                "                                    ~\n" +
+                "    src/aa/A.java:31: This expression [return field2;] is immutable.\n" +
+                "src/aa/B.java:13: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    public Map<Long, String> f() { //should lint\n" +
+                "                             ~\n" +
+                "    src/aa/B.java:14: This expression [return getA().field;] is immutable.\n" +
+                "src/aa/B.java:17: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    public Map<Long, String> g() { //should lint\n" +
+                "                             ~\n" +
+                "    src/aa/B.java:18: This expression [return field2;] is immutable.\n" +
+                "4 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 26: Annotate method [b] with @Immutable:\n" +
+                "@@ -26 +26\n" +
+                "-     public Map<Long, String> b() { //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable public Map<Long, String> b() { //should lint\n" +
+                "Fix for src/aa/A.java line 30: Annotate method [c] with @Immutable:\n" +
+                "@@ -30 +30\n" +
+                "-     protected TreeMap<Long, String> c() { //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable protected TreeMap<Long, String> c() { //should lint\n" +
+                "Fix for src/aa/B.java line 13: Annotate method [f] with @Immutable:\n" +
+                "@@ -13 +13\n" +
+                "-     public Map<Long, String> f() { //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable public Map<Long, String> f() { //should lint\n" +
+                "Fix for src/aa/B.java line 17: Annotate method [g] with @Immutable:\n" +
+                "@@ -17 +17\n" +
+                "-     public Map<Long, String> g() { //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable public Map<Long, String> g() { //should lint")
+    }
+
+    @Test
+    fun `Check Java local @Immutable to method return`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    protected List<String> list = new ArrayList<>();
+
+                    public Set<String> a(){ //should lint
+                        @Immutable
+                        Set<String> set = new TreeSet<String>(){
+                            {
+                                add("33");
+                                add("22");
+                            }
+                        };
+                        return set;
+                    }
+
+                    public Set<String> b(){ //should not lint
+                        Set<String> set = new TreeSet<String>(){
+                            {
+                                add("33");
+                                add("22");
+                            }
+                        };
+                        return set;
+                    }
+
+                    public List<String> c() { //should lint
+                        List<String> local = list;
+                        return local;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B extends A {
+
+                    public List<String> d() { //should lint
+                        List<String> local = list;
+                        local.add("3"); //should lint
+                        return local;
+                    }
+
+                    public List<String> e() { //should not lint
+                        List<String> local = new ArrayList<>(list);
+                        return local;
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:12: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    public Set<String> a(){ //should lint\n" +
+                "                       ~\n" +
+                "    src/aa/A.java:20: This expression [return set;] is immutable.\n" +
+                "src/aa/A.java:33: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    public List<String> c() { //should lint\n" +
+                "                        ~\n" +
+                "    src/aa/A.java:35: This expression [return local;] is immutable.\n" +
+                "src/aa/B.java:9: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    public List<String> d() { //should lint\n" +
+                "                        ~\n" +
+                "    src/aa/B.java:12: This expression [return local;] is immutable.\n" +
+                "src/aa/B.java:11: Error: you cannot invoke the [add(\"3\")] method on an immutable object. [ImmutableObject]\n" +
+                "        local.add(\"3\"); //should lint\n" +
+                "        ~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:9: This reference is annotated by @Immutable\n" +
+                "4 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 12: Annotate method [a] with @Immutable:\n" +
+                "@@ -12 +12\n" +
+                "-     public Set<String> a(){ //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable public Set<String> a(){ //should lint\n" +
+                "Fix for src/aa/A.java line 33: Annotate method [c] with @Immutable:\n" +
+                "@@ -33 +33\n" +
+                "-     public List<String> c() { //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable public List<String> c() { //should lint\n" +
+                "Fix for src/aa/B.java line 9: Annotate method [d] with @Immutable:\n" +
+                "@@ -9 +9\n" +
+                "-     public List<String> d() { //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable public List<String> d() { //should lint")
+    }
+
+//    @Test
+//    fun `Check Java method @Immutable to method return`() {
+//
+//        TestLintTask.lint().files(
+//            immutableAnnotation,
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class A {
+//
+//                    @Immutable
+//                    public Map<Long, String> a() {
+//                        Map<Long, String> local = new HashMap<>();
+//                        local.put(3L, "2");
+//                        return local;
+//                    }
+//
+//                    public Map<Long, String> b() { //should lint
+//                        return a();
+//                    }
+//
+//                    protected Map<Long, String> c() { //should lint
+//                        Map<Long, String> local = a();
+//                        local.clear(); //should lint
+//                        return local;
+//                    }
+//                }
+//            """.trimIndent()),
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class B {
+//
+//                    public A getA() {
+//                        return new A();
+//                    }
+//
+//                    public Map<Long, String> a() {
+//                        getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
+//                    }
+//                }
+//            """.trimIndent()))
+//            .detector(WhisperImmutableDetector())
+//            .run()
+//            .expect("")
+//            .expectFixDiffs("")
+//    }
+//
+//    @Test
+//    fun `Check Java argument @Immutable to local`() {
+//
+//        TestLintTask.lint().files(
+//            immutableAnnotation,
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class A {
+//
+//                    @Immutable
+//                    private final Map<Long, String> field;
+//
+//                    @Immutable
+//                    final TreeMap<Long, String> field2 = new TreeMap<>();
+//
+//                    public A() {
+//                        Map<Long, String> local = new HashMap<>();
+//                        local.put(3L, "2");
+//                        field = local;
+//                    }
+//
+//                    public Map<Long, String> b() { //should lint
+//                        return field;
+//                    }
+//
+//                    protected TreeMap<Long, String> c() { //should lint
+//                        return field2;
+//                    }
+//                }
+//            """.trimIndent()),
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class B {
+//
+//                    public A getA() {
+//                        return new A();
+//                    }
+//
+//                    public Map<Long, String> a() {
+//                        getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
+//                    }
+//                }
+//            """.trimIndent()))
+//            .detector(WhisperImmutableDetector())
+//            .run()
+//            .expect("")
+//            .expectFixDiffs("")
+//    }
+//
+//    @Test
+//    fun `Check Java argument @Immutable to field`() {
+//
+//        TestLintTask.lint().files(
+//            immutableAnnotation,
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class A {
+//
+//                    @Immutable
+//                    private final Map<Long, String> field;
+//
+//                    @Immutable
+//                    final TreeMap<Long, String> field2 = new TreeMap<>();
+//
+//                    public A() {
+//                        Map<Long, String> local = new HashMap<>();
+//                        local.put(3L, "2");
+//                        field = local;
+//                    }
+//
+//                    public Map<Long, String> b() { //should lint
+//                        return field;
+//                    }
+//
+//                    protected TreeMap<Long, String> c() { //should lint
+//                        return field2;
+//                    }
+//                }
+//            """.trimIndent()),
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class B {
+//
+//                    public A getA() {
+//                        return new A();
+//                    }
+//
+//                    public Map<Long, String> a() {
+//                        getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
+//                    }
+//                }
+//            """.trimIndent()))
+//            .detector(WhisperImmutableDetector())
+//            .run()
+//            .expect("")
+//            .expectFixDiffs("")
+//    }
+//
+//    @Test
+//    fun `Check Java argument @Immutable to method return`() {
+//
+//        TestLintTask.lint().files(
+//            immutableAnnotation,
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class A {
+//
+//                    @Immutable
+//                    private final Map<Long, String> field;
+//
+//                    @Immutable
+//                    final TreeMap<Long, String> field2 = new TreeMap<>();
+//
+//                    public A() {
+//                        Map<Long, String> local = new HashMap<>();
+//                        local.put(3L, "2");
+//                        field = local;
+//                    }
+//
+//                    public Map<Long, String> b() { //should lint
+//                        return field;
+//                    }
+//
+//                    protected TreeMap<Long, String> c() { //should lint
+//                        return field2;
+//                    }
+//                }
+//            """.trimIndent()),
+//            java("""
+//                package aa;
+//
+//                import com.yy.mobile.whisper.Immutable;
+//
+//                import java.util.*;
+//
+//                public class B {
+//
+//                    public A getA() {
+//                        return new A();
+//                    }
+//
+//                    public Map<Long, String> a() {
+//                        getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
+//                    }
+//                }
+//            """.trimIndent()))
+//            .detector(WhisperImmutableDetector())
+//            .run()
+//            .expect("")
+//            .expectFixDiffs("")
+//    }
 }

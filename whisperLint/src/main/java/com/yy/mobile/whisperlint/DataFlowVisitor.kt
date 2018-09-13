@@ -285,13 +285,8 @@ abstract class DataFlowVisitor(
     override fun afterVisitReturnExpression(node: UReturnExpression) {
         val returnValue = node.returnExpression
         if (returnValue != null) {
-            if (instances.contains(returnValue)) {
+            if (includeNode(returnValue)) {
                 returns(node)
-            } else if (returnValue is UReferenceExpression) {
-                val resolved = returnValue.resolve()
-                if (resolved != null && references.contains(resolved)) {
-                    returns(node)
-                }
             }
         }
     }

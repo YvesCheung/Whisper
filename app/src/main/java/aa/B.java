@@ -1,19 +1,17 @@
 package aa;
 
-import java.util.Collections;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
-public class B {
+public class B extends A {
 
-    public A getA() {
-        return new A();
+    public List<String> d() { //should lint
+        List<String> local = list;
+        return local;
     }
 
-    Map<Long, String> field = getA().field; //should lint
-
-    Map<Long, String> field2 = getA().field2; //should lint
-
-    public void a() {
-        getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
+    public List<String> e() { //should not lint
+        List<String> local = new ArrayList<>(list);
+        return local;
     }
 }

@@ -2,23 +2,36 @@ package aa;
 
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 
 public class A {
 
     @Immutable
-    public final Map<Long, String> field;
+    protected List<String> list = new ArrayList<>();
 
-    @Immutable
-    public final Map<Long, String> field2 = new TreeMap<>();
+    public Set<String> a(){ //should lint
+        @Immutable
+        Set<String> set = new TreeSet<String>(){
+            {
+                add("33");
+                add("22");
+            }
+        };
+        return set;
+    }
 
-    private Map<Long, String> field3 = field2; //should lint
+    public Set<String> b(){ //should not lint
+        Set<String> set = new TreeSet<String>(){
+            {
+                add("33");
+                add("22");
+            }
+        };
+        return set;
+    }
 
-    public A() {
-        Map<Long, String> local = new HashMap<>();
-        local.put(3L, "2");
-        field = local;
+    public List<String> c() { //should lint
+        List<String> local = list;
+        return local;
     }
 }
