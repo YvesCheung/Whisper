@@ -25,6 +25,7 @@ import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UField
+import org.jetbrains.uast.UParameter
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
@@ -180,9 +181,10 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         UClass::class.java,
         UField::class.java,
         UCallExpression::class.java,
-        USimpleNameReferenceExpression::class.java)
+        USimpleNameReferenceExpression::class.java,
+        UParameter::class.java)
 
-    private val checkFieldsToScope = mutableSetOf<Pair<PsiField, UElement>>()
+    private val checkFieldsToScope = mutableSetOf<Pair<PsiElement, UElement>>()
 
     override fun createUastHandler(context: JavaContext): UElementHandler? {
         return object : UElementHandler() {
@@ -243,6 +245,14 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                     checkFieldsToScope.add(psiRef to scope)
                 }
             }
+
+            override fun visitParameter(node: UParameter) {
+                if (checkIsImmutable(node.annotations)) {
+                    val scope = node.getContainingUMethod() ?: return
+                    node.javaPsi?.let { checkFieldsToScope.add(it to scope) }
+                    node.sourcePsi?.let { checkFieldsToScope.add(it to scope) }
+                }
+            }
         }
     }
 
@@ -263,7 +273,6 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
         return type == AnnotationUsageType.ASSIGNMENT ||
-            type == AnnotationUsageType.METHOD_CALL_PARAMETER ||
             type == AnnotationUsageType.METHOD_CALL
     }
 
@@ -281,17 +290,14 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
     ) {
         usage as? UExpression ?: return
 
-        if (type != AnnotationUsageType.METHOD_CALL_PARAMETER) {
+        val scope: UElement = usage.getContainingUMethod() as? UElement
+            ?: usage.getContainingUClass()
+            ?: usage.getContainingUFile()
+            ?: return
 
-            val scope: UElement = usage.getContainingUMethod() as? UElement
-                ?: usage.getContainingUClass()
-                ?: usage.getContainingUFile()
-                ?: return
+        val (instances, references, properties) = usage.getAvailableReturnValue()
 
-            val (instances, references, properties) = usage.getAvailableReturnValue()
-
-            deepSearchUsage(context, context.getLocation(usage), scope, instances, references, properties)
-        }
+        deepSearchUsage(context, context.getLocation(usage), scope, instances, references, properties)
     }
 
     private fun deepSearchUsage(

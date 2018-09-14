@@ -2,36 +2,45 @@ package aa;
 
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Queue;
 
 public class A {
 
-    @Immutable
-    protected List<String> list = new ArrayList<>();
+    public void a(@Immutable Collection<String> list) {
+        for (String a : list) {
+            System.out.println(a);
+        }
+    }
 
-    public Set<String> a(){ //should lint
+    protected Long b(@Immutable Queue<Long> que) {
+        c(que);
+        return que.peek();
+    }
+
+    public void c(Queue<Long> queue) { //should lint
+        b(queue);
+        throw new UnsupportedOperationException("not implement");
+    }
+
+    public void d() {
         @Immutable
-        Set<String> set = new TreeSet<String>(){
+        Map<String, String> map = new HashMap<String, String>() {
             {
-                add("33");
-                add("22");
+                put("a", "b");
             }
         };
-        return set;
+        Collection<String> list = map.values();
+
+        a(list); //should not lint
+
+        e(map); //should lint
     }
 
-    public Set<String> b(){ //should not lint
-        Set<String> set = new TreeSet<String>(){
-            {
-                add("33");
-                add("22");
-            }
-        };
-        return set;
-    }
-
-    public List<String> c() { //should lint
-        List<String> local = list;
-        return local;
+    public void e(Map<String, String> map) {
+        d();
+        System.out.println(map);
     }
 }

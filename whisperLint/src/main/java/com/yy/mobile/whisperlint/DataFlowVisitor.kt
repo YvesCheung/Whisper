@@ -96,6 +96,8 @@ abstract class DataFlowVisitor(
     protected fun includeNode(node: UExpression?): Boolean {
         node ?: return false
 
+        if(node.javaPsi?.text == "System.out") return false
+
         fun isLightMethodButNotConstructor(psi: PsiElement): Boolean {
             if (psi is KtLightMethod) {
                 if (node is UCallExpression) {
