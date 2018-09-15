@@ -2,45 +2,33 @@ package aa;
 
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Queue;
+import java.util.*;
 
 public class A {
+
+    @Immutable
+    protected Map<String, String> map = new HashMap<String, String>() {
+        {
+            put("a", "b");
+        }
+    };
+
+    Collection<String> list = map.values(); //should lint
 
     public void a(@Immutable Collection<String> list) {
         for (String a : list) {
             System.out.println(a);
         }
+        b(map); //should lint
     }
 
-    protected Long b(@Immutable Queue<Long> que) {
-        c(que);
-        return que.peek();
+    public void b(Map<String, String> map) {
+        c(this.map);
+        throw new RuntimeException(map.keySet().toString());
     }
 
-    public void c(Queue<Long> queue) { //should lint
-        b(queue);
-        throw new UnsupportedOperationException("not implement");
-    }
-
-    public void d() {
-        @Immutable
-        Map<String, String> map = new HashMap<String, String>() {
-            {
-                put("a", "b");
-            }
-        };
-        Collection<String> list = map.values();
-
-        a(list); //should not lint
-
-        e(map); //should lint
-    }
-
-    public void e(Map<String, String> map) {
-        d();
-        System.out.println(map);
+    public void c(@Immutable Map<? extends CharSequence, String> map) {
+        a(map.values());
+        a(list);
     }
 }

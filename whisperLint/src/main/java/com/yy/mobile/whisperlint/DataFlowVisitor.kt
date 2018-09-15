@@ -51,7 +51,7 @@ abstract class DataFlowVisitor(
     open fun returns(expression: UReturnExpression) {}
 
     /** The instance being tracked is being stored into a field */
-    open fun field(assignment: UElement, field: PsiField) {}
+    open fun field(assignment: UElement?, field: PsiField) {}
 
     /** The instance being tracked is being passed in a method call */
     open fun argument(
@@ -96,7 +96,7 @@ abstract class DataFlowVisitor(
     protected fun includeNode(node: UExpression?): Boolean {
         node ?: return false
 
-        if(node.javaPsi?.text == "System.out") return false
+        if (node.javaPsi?.text == "System.out") return false
 
         fun isLightMethodButNotConstructor(psi: PsiElement): Boolean {
             if (psi is KtLightMethod) {
@@ -240,6 +240,7 @@ abstract class DataFlowVisitor(
             (node.javaPsi as? PsiVariable)?.let { references.add(it) }
         } else if (node is UField) {
             properties.add(node.text)
+            field(node.uastInitializer, node)
         }
     }
 

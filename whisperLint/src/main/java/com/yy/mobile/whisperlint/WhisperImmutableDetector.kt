@@ -13,11 +13,14 @@ import com.android.tools.lint.detector.api.Location
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.getMethodName
+import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiModifierListOwner
+import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiVariable
+import com.intellij.psi.impl.source.PsiClassReferenceType
 import org.jetbrains.uast.UAnnotated
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
@@ -89,7 +92,8 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             "headMap",
             "tailMap",
             "headSet",
-            "tailSet")
+            "tailSet",
+            "next")
 
         private const val collectionCls = "java.util.Collection"
 
@@ -175,6 +179,13 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         private val entryMethods = setOf(
             "setValue"
         )
+
+        private val aimCls = listOf(
+            collectionCls,
+            mapCls,
+            entryCls,
+            iteratorCls
+        )
     }
 
     override fun getApplicableUastTypes(): List<Class<out UElement>> = listOf(
@@ -185,6 +196,8 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         UParameter::class.java)
 
     private val checkFieldsToScope = mutableSetOf<Pair<PsiElement, UElement>>()
+
+    private val reportFieldsToAssignment = mutableSetOf<Pair<PsiField, UElement>>()
 
     override fun createUastHandler(context: JavaContext): UElementHandler? {
         return object : UElementHandler() {
@@ -214,7 +227,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 else if (initializer != null && !checkIsImmutable(node.annotations)) {
 
                     if (checkIsImmutable(initializer)) {
-                        reportField(context, initializer, node)
+                        reportFieldsToAssignment.add(node to initializer)
                     }
                 }
             }
@@ -258,6 +271,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
     override fun beforeCheckFile(context: Context) {
         checkFieldsToScope.clear()
+        reportFieldsToAssignment.clear()
     }
 
     override fun afterCheckFile(context: Context) {
@@ -265,6 +279,10 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             for ((field, scope) in checkFieldsToScope) {
                 deepSearchUsage(context, context.getLocation(field), scope,
                     references = listOf(field))
+            }
+
+            reportFieldsToAssignment.forEach { (field, assignment) ->
+                reportField(context, assignment, field)
             }
         }
     }
@@ -341,11 +359,10 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 }
             }
 
-            override fun field(assignment: UElement, field: PsiField) {
-                System.out.println("field = $field assign = ${assignment.asSourceString()}")
-                if (!checkIsImmutable(field)) {
-                    abort = true
-                    reportField(context, assignment, field)
+            override fun field(assignment: UElement?, field: PsiField) {
+                System.out.println("field = $field assign = ${assignment?.asSourceString()}")
+                if (assignment != null && !checkIsImmutable(field)) {
+                    reportFieldsToAssignment.add(field to assignment)
                 }
             }
 
@@ -372,6 +389,41 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                         method,
                         methodLocation.withSecondary(refLocation, referenceMsg),
                         mainMsg,
+                        quickFix)
+                }
+            }
+
+            override fun argument(call: UCallExpression, reference: UElement) {
+                System.out.println("argument = $call $reference")
+                val method = call.resolve() ?: return
+                val paramIndex = call.valueArguments.indexOf(reference)
+                val param = method.parameters.getOrNull(paramIndex) as? PsiParameter ?: return
+                val paramCls = (param.type as? PsiClassReferenceType)?.resolve() ?: return
+                val refLocation = context.getLocation(param)
+                if (refLocation.start == null || refLocation.end == null) return
+                if (!context.checkIsAimClass(paramCls)) {
+                    return
+                }
+                val paramName = param.name
+                if (!checkIsImmutable(param as PsiModifierListOwner)) {
+                    val msg = "Unable to pass an immutable object [${reference.asSourceString()}] " +
+                        "to a mutable parameter [${call.asSourceString()}]."
+                    val callLocation = context.getCallLocation(call, true, true)
+
+                    val refMsg = "this parameter [$paramName] is mutable."
+                    val quickFix = LintFix.create()
+                        .name("Annotate parameter [${param.text}] with @Immutable")
+                        .replace()
+                        .range(refLocation)
+                        .with("@$immutableAnnotation ${param.text}")
+                        .reformat(true)
+                        .shortenNames()
+                        .build()
+
+                    context.report(ISSUE_WHISPER_MISSING_IMMUTABLE,
+                        call,
+                        refLocation.withSecondary(callLocation, msg),
+                        refMsg,
                         quickFix)
                 }
             }
@@ -407,6 +459,15 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
     private fun checkIsImmutable(element: UElement): Boolean {
         if (element is UCallExpression) {
+            if (checkReturnMethods.contains(getMethodName(element))) {
+                var receiver: UExpression? = element.receiver
+                while (receiver is UQualifiedReferenceExpression) {
+                    receiver = receiver.receiver
+                }
+                if (receiver != null && checkIsImmutable(receiver)) {
+                    return true
+                }
+            }
             val method = element.resolve()
             if (method != null && checkIsImmutable(method)) {
                 return true
@@ -434,6 +495,10 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
     private fun checkIsImmutable(element: PsiModifierListOwner): Boolean {
         return element.annotations.find { it.qualifiedName == immutableAnnotation } != null
+    }
+
+    private fun JavaContext.checkIsAimClass(cls: PsiClass): Boolean {
+        return aimCls.any { this.evaluator.extendsClass(cls, it, false) }
     }
 
     private fun isEntryMethod(call: UCallExpression, context: JavaContext) =

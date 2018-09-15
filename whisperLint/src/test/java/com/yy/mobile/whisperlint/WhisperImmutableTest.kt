@@ -848,10 +848,10 @@ class WhisperImmutableTest {
                         field = a();
 
                         Set<Long> keySet = field.keySet();
-                        keySet.clear();
+                        keySet.clear(); //should lint
 
                         for (Map.Entry<Long, String> entry : field.entrySet()) {
-                            entry.setValue("haha");
+                            entry.setValue("haha"); //should lint
                         }
                     }
                 }
@@ -872,11 +872,11 @@ class WhisperImmutableTest {
                     Map<Long, String> field = new B().getA().a(); //should lint
 
                     public void a() {
-                        field.putAll(Collections.singletonMap(4L, "ll"));
+                        field.putAll(Collections.singletonMap(4L, "ll")); //should lint
                     }
 
                     public void b() {
-                        field.put(5L, "aa");
+                        field.put(5L, "aa"); //should lint
                     }
                 }
             """.trimIndent()))
@@ -890,15 +890,23 @@ class WhisperImmutableTest {
                 "    Map<Long, String> field = new B().getA().a(); //should lint\n" +
                 "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/B.java:13: This expression [new B().getA().a()] is immutable.\n" +
+                "src/aa/A.java:22: Error: you cannot invoke the [clear()] method on an immutable object. [ImmutableObject]\n" +
+                "        keySet.clear(); //should lint\n" +
+                "        ~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:19: This reference is annotated by @Immutable\n" +
+                "src/aa/A.java:25: Error: you cannot invoke the [setValue(\"haha\")] method on an immutable object. [ImmutableObject]\n" +
+                "            entry.setValue(\"haha\"); //should lint\n" +
+                "            ~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:19: This reference is annotated by @Immutable\n" +
                 "src/aa/B.java:16: Error: you cannot invoke the [putAll(Collections.singletonMap(4, \"ll\"))] method on an immutable object. [ImmutableObject]\n" +
-                "        field.putAll(Collections.singletonMap(4L, \"ll\"));\n" +
+                "        field.putAll(Collections.singletonMap(4L, \"ll\")); //should lint\n" +
                 "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/B.java:13: This reference is annotated by @Immutable\n" +
                 "src/aa/B.java:20: Error: you cannot invoke the [put(5, \"aa\")] method on an immutable object. [ImmutableObject]\n" +
-                "        field.put(5L, \"aa\");\n" +
+                "        field.put(5L, \"aa\"); //should lint\n" +
                 "        ~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/B.java:13: This reference is annotated by @Immutable\n" +
-                "4 errors, 0 warnings")
+                "6 errors, 0 warnings")
             .expectFixDiffs("Fix for src/aa/A.java line 9: Annotate [field] with @Immutable:\n" +
                 "@@ -9 +9\n" +
                 "-     private Map<Long, String> field; //should lint\n" +
@@ -966,6 +974,51 @@ class WhisperImmutableTest {
                         getA().field.putAll(Collections.singletonMap(4L, "ll")); //should lint
                     }
                 }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+                import java.util.*;
+
+                public class C {
+
+                    @Immutable
+                    protected Map<String, String> map = new HashMap<String, String>() {
+                        {
+                            put("a", "b");
+                        }
+                    };
+
+                    private Collection<String> list = map.values(); //should lint
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+                import java.util.*;
+
+                public class D {
+
+                    @Immutable
+                    protected Map<String, String> map = new HashMap<String, String>() {
+                        {
+                            put("a", "b");
+                        }
+                    };
+
+                    private Iterator<String> iter = map.keySet().iterator(); //should lint
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+                import java.utils.*;
+
+                class E extends C {
+
+                    private Map.Entry<String, String> entry = map.entrySet().iterator().next(); //should lint
+                }
             """.trimIndent()))
             .detector(WhisperImmutableDetector())
             .run()
@@ -981,11 +1034,23 @@ class WhisperImmutableTest {
                 "    Map<Long, String> field2 = getA().field2; //should lint\n" +
                 "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/B.java:15: This expression [getA().field2] is immutable.\n" +
+                "src/aa/C.java:15: Error: Unable to assign an immutable object [map.values()] to a mutable field [list]. [ImmutableEscape]\n" +
+                "    private Collection<String> list = map.values(); //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/C.java:15: This expression [map.values()] is immutable.\n" +
+                "src/aa/D.java:15: Error: Unable to assign an immutable object [map.keySet().iterator()] to a mutable field [iter]. [ImmutableEscape]\n" +
+                "    private Iterator<String> iter = map.keySet().iterator(); //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/D.java:15: This expression [map.keySet().iterator()] is immutable.\n" +
+                "src/aa/E.java:6: Error: Unable to assign an immutable object [map.entrySet().iterator().next()] to a mutable field [entry]. [ImmutableEscape]\n" +
+                "    private Map.Entry<String, String> entry = map.entrySet().iterator().next(); //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/E.java:6: This expression [map.entrySet().iterator().next()] is immutable.\n" +
                 "src/aa/B.java:18: Error: you cannot invoke the [putAll(Collections.singletonMap(4, \"ll\"))] method on an immutable object. [ImmutableObject]\n" +
                 "        getA().field.putAll(Collections.singletonMap(4L, \"ll\")); //should lint\n" +
                 "        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/A.java:9: This reference is annotated by @Immutable\n" +
-                "4 errors, 0 warnings")
+                "7 errors, 0 warnings")
             .expectFixDiffs("Fix for src/aa/A.java line 15: Annotate [field3] with @Immutable:\n" +
                 "@@ -15 +15\n" +
                 "-     private Map<Long, String> field3 = field2; //should lint\n" +
@@ -997,7 +1062,19 @@ class WhisperImmutableTest {
                 "Fix for src/aa/B.java line 15: Annotate [field2] with @Immutable:\n" +
                 "@@ -15 +15\n" +
                 "-     Map<Long, String> field2 = getA().field2; //should lint\n" +
-                "+     @com.yy.mobile.whisper.Immutable Map<Long, String> field2 = getA().field2; //should lint")
+                "+     @com.yy.mobile.whisper.Immutable Map<Long, String> field2 = getA().field2; //should lint\n" +
+                "Fix for src/aa/C.java line 15: Annotate [list] with @Immutable:\n" +
+                "@@ -15 +15\n" +
+                "-     private Collection<String> list = map.values(); //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private Collection<String> list = map.values(); //should lint\n" +
+                "Fix for src/aa/D.java line 15: Annotate [iter] with @Immutable:\n" +
+                "@@ -15 +15\n" +
+                "-     private Iterator<String> iter = map.keySet().iterator(); //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private Iterator<String> iter = map.keySet().iterator(); //should lint\n" +
+                "Fix for src/aa/E.java line 6: Annotate [entry] with @Immutable:\n" +
+                "@@ -6 +6\n" +
+                "-     private Map.Entry<String, String> entry = map.entrySet().iterator().next(); //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable private Map.Entry<String, String> entry = map.entrySet().iterator().next(); //should lint")
     }
 
     @Test
@@ -1627,11 +1704,11 @@ class WhisperImmutableTest {
                     }
 
                     protected Long b(@Immutable Queue<Long> que) {
-                        c(que);
+                        c(que); //should lint
                         return que.peek();
                     }
 
-                    public void c(Queue<Long> queue) { //should lint
+                    public void c(Queue<Long> queue) {
                         b(queue);
                         throw new UnsupportedOperationException("not implement");
                     }
@@ -1658,44 +1735,125 @@ class WhisperImmutableTest {
             """.trimIndent()))
             .detector(WhisperImmutableDetector())
             .run()
-            .expect("")
-            .expectFixDiffs("")
+            .expect("src/aa/A.java:20: Error: this parameter [queue] is mutable. [ImmutableEscape]\n" +
+                "    public void c(Queue<Long> queue) {\n" +
+                "                  ~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:16: Unable to pass an immutable object [que] to a mutable parameter [c(que)].\n" +
+                "src/aa/A.java:39: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "    public void e(Map<String, String> map) {\n" +
+                "                  ~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:36: Unable to pass an immutable object [map] to a mutable parameter [e(map)].\n" +
+                "2 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 20: Annotate parameter [Queue<Long> queue] with @Immutable:\n" +
+                "@@ -20 +20\n" +
+                "-     public void c(Queue<Long> queue) {\n" +
+                "+     public void c(@com.yy.mobile.whisper.Immutable Queue<Long> queue) {\n" +
+                "Fix for src/aa/A.java line 39: Annotate parameter [Map<String, String> map] with @Immutable:\n" +
+                "@@ -39 +39\n" +
+                "-     public void e(Map<String, String> map) {\n" +
+                "+     public void e(@com.yy.mobile.whisper.Immutable Map<String, String> map) {")
     }
 
-//    @Test
-//    fun `Check Java field @Immutable to argument`() {
-//
-//        TestLintTask.lint().files(
-//            immutableAnnotation,
-//            java("""
-//                package aa;
-//
-//                import com.yy.mobile.whisper.Immutable;
-//
-//                import java.util.*;
-//
-//                public class A {
-//
-//
-//                }
-//            """.trimIndent()),
-//            java("""
-//                package aa;
-//
-//                import com.yy.mobile.whisper.Immutable;
-//
-//                import java.util.*;
-//
-//                public class B {
-//
-//                }
-//            """.trimIndent()))
-//            .detector(WhisperImmutableDetector())
-//            .run()
-//            .expect("")
-//            .expectFixDiffs("")
-//    }
-//
+    @Test
+    fun `Check Java field @Immutable to argument`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    protected Map<String, String> map = new HashMap<String, String>() {
+                        {
+                            put("a", "b");
+                        }
+                    };
+
+                    Collection<String> list = map.values(); //should lint
+
+                    public void a(@Immutable Collection<String> list) {
+                        for (String a : list) {
+                            System.out.println(a);
+                        }
+                        b(map); //should lint
+                    }
+
+                    public void b(Map<String, String> map) {
+                        c(this.map);
+                        throw new RuntimeException(map.keySet().toString());
+                    }
+
+                    public void c(@Immutable Map<? extends CharSequence, String> map) {
+                        a(map.values());
+                        a(list);
+                    }
+                }
+            """.trimIndent())
+            ,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B extends A {
+
+                    public void d(Map<String, ? extends CharSequence> map) {
+                        b(this.map); //should lint
+                        e(this.map.values());
+                        e(map.values());
+                    }
+
+                    public void e(@Immutable Collection<? extends CharSequence> collection) {
+                        d(this.map); //should lint
+                        d(new HashMap<>(this.map));
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:16: Error: Unable to assign an immutable object [map.values()] to a mutable field [list]. [ImmutableEscape]\n" +
+                "    Collection<String> list = map.values(); //should lint\n" +
+                "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:16: This expression [map.values()] is immutable.\n" +
+                "src/aa/A.java:25: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "    public void b(Map<String, String> map) {\n" +
+                "                  ~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:22: Unable to pass an immutable object [map] to a mutable parameter [b(map)].\n" +
+                "src/aa/A.java:25: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "    public void b(Map<String, String> map) {\n" +
+                "                  ~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:10: Unable to pass an immutable object [this.map] to a mutable parameter [b(this.map)].\n" +
+                "src/aa/B.java:9: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "    public void d(Map<String, ? extends CharSequence> map) {\n" +
+                "                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:16: Unable to pass an immutable object [this.map] to a mutable parameter [d(this.map)].\n" +
+                "4 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 16: Annotate [list] with @Immutable:\n" +
+                "@@ -16 +16\n" +
+                "-     Collection<String> list = map.values(); //should lint\n" +
+                "+     @com.yy.mobile.whisper.Immutable Collection<String> list = map.values(); //should lint\n" +
+                "Fix for src/aa/A.java line 25: Annotate parameter [Map<String, String> map] with @Immutable:\n" +
+                "@@ -25 +25\n" +
+                "-     public void b(Map<String, String> map) {\n" +
+                "+     public void b(@com.yy.mobile.whisper.Immutable Map<String, String> map) {\n" +
+                "Fix for src/aa/A.java line 25: Annotate parameter [Map<String, String> map] with @Immutable:\n" +
+                "@@ -25 +25\n" +
+                "-     public void b(Map<String, String> map) {\n" +
+                "+     public void b(@com.yy.mobile.whisper.Immutable Map<String, String> map) {\n" +
+                "Fix for src/aa/B.java line 9: Annotate parameter [Map<String, ? extends CharSequence> map] with @Immutable:\n" +
+                "@@ -9 +9\n" +
+                "-     public void d(Map<String, ? extends CharSequence> map) {\n" +
+                "+     public void d(@com.yy.mobile.whisper.Immutable Map<String, ? extends CharSequence> map) {")
+    }
+
 //    @Test
 //    fun `Check Java method return @Immutable to argument`() {
 //
