@@ -9,10 +9,10 @@ import com.android.tools.lint.detector.api.Implementation
 import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.LintFix
+import com.android.tools.lint.detector.api.LintUtils.getMethodName
 import com.android.tools.lint.detector.api.Location
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
-import com.android.tools.lint.detector.api.getMethodName
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
@@ -248,7 +248,8 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 if (initializer == null && checkIsImmutable(node.annotations)) {
                     val scope = node.getContainingUClass() ?: return
                     val instances = listOf(node)
-                    val references = listOfNotNull(node.sourcePsi, node.javaPsi)
+                    //val references = listOfNotNull(node.sourcePsi, node.javaPsi)
+                    val references = listOfNotNull(node.psi)
                     val properties = listOfNotNull(node.text)
                     deepSearchUsage(context, context.getLocation(node), scope,
                         instances = instances,
@@ -295,8 +296,9 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             override fun visitParameter(node: UParameter) {
                 if (checkIsImmutable(node.annotations)) {
                     val scope = node.getContainingUMethod() ?: return
-                    node.javaPsi?.let { checkFieldsToScope.add(it to scope) }
-                    node.sourcePsi?.let { checkFieldsToScope.add(it to scope) }
+                    // node.javaPsi?.let { checkFieldsToScope.add(it to scope) }
+                    // node.sourcePsi?.let { checkFieldsToScope.add(it to scope) }
+                    node.psi.let { checkFieldsToScope.add(it to scope) }
                 }
             }
 

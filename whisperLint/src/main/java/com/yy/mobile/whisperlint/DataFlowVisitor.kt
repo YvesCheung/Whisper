@@ -1,7 +1,6 @@
 package com.yy.mobile.whisperlint
 
-import com.android.tools.lint.detector.api.getMethodName
-import com.android.tools.lint.detector.api.skipParentheses
+import com.android.tools.lint.detector.api.LintUtils.getMethodName
 import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
@@ -11,22 +10,17 @@ import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UBlockExpression
 import org.jetbrains.uast.UCallExpression
-import org.jetbrains.uast.UDeclarationsExpression
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
-import org.jetbrains.uast.UExpressionList
 import org.jetbrains.uast.UField
 import org.jetbrains.uast.UForEachExpression
 import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.ULocalVariable
-import org.jetbrains.uast.UPolyadicExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
-import org.jetbrains.uast.UReferenceExpression
 import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.UastCallKind.Companion.CONSTRUCTOR_CALL
 import org.jetbrains.uast.getParentOfType
-import org.jetbrains.uast.getQualifiedParentOrThis
 import org.jetbrains.uast.kotlin.AbstractKotlinUVariable
 import org.jetbrains.uast.tryResolve
 import org.jetbrains.uast.util.isAssignment
@@ -96,7 +90,8 @@ abstract class DataFlowVisitor(
     protected fun includeNode(node: UExpression?): Boolean {
         node ?: return false
 
-        if (node.javaPsi?.text == "System.out") return false
+        if (node.psi?.text == "System.out") return false
+        //if (node.javaPsi?.text == "System.out") return false
 
         fun isLightMethodButNotConstructor(psi: PsiElement): Boolean {
             if (psi is KtLightMethod) {
@@ -236,8 +231,9 @@ abstract class DataFlowVisitor(
 
     protected fun addVariableReference(node: UVariable) {
         if (node is ULocalVariable) {
-            (node.sourcePsi as? PsiVariable)?.let { references.add(it) }
-            (node.javaPsi as? PsiVariable)?.let { references.add(it) }
+//            (node.sourcePsi as? PsiVariable)?.let { references.add(it) }
+//            (node.javaPsi as? PsiVariable)?.let { references.add(it) }
+            (node.psi as? PsiVariable)?.let { references.add(it) }
         } else if (node is UField) {
             properties.add(node.text)
             field(node.uastInitializer, node)
@@ -246,8 +242,9 @@ abstract class DataFlowVisitor(
 
     protected fun removeVariableReference(node: UVariable) {
         if (node is ULocalVariable) {
-            (node.sourcePsi as? PsiVariable)?.let { references.remove(it) }
-            (node.javaPsi as? PsiVariable)?.let { references.remove(it) }
+//            (node.sourcePsi as? PsiVariable)?.let { references.remove(it) }
+//            (node.javaPsi as? PsiVariable)?.let { references.remove(it) }
+            (node.psi as? PsiVariable)?.let { references.remove(it) }
         } else if (node is UField) {
             properties.remove(node.text)
         }
@@ -306,7 +303,8 @@ abstract class DataFlowVisitor(
                 val ins = listOf(forEachValue).also {
                     this.instances.addAll(it)
                 }
-                val ref = listOfNotNull(forEachValue.sourcePsi, forEachValue.javaPsi).also {
+//                val ref = listOfNotNull(forEachValue.sourcePsi, forEachValue.javaPsi).also {
+                val ref = listOfNotNull(forEachValue.psi).also {
                     this.references.addAll(it)
                 }
                 val prop = emptyList<String>()
@@ -337,76 +335,5 @@ abstract class DataFlowVisitor(
         }
         val resolvedCall = call.resolve() ?: return false
         return (call.returnType as? PsiClassType)?.resolve() == resolvedCall.containingClass
-    }
-
-    companion object {
-        /** Returns the variable the expression is assigned to, if any  */
-        fun getVariableElement(rhs: UCallExpression): PsiVariable? {
-            return getVariableElement(rhs, false, false)
-        }
-
-        fun getVariableElement(
-            rhs: UCallExpression,
-            allowChainedCalls: Boolean,
-            allowFields: Boolean
-        ): PsiVariable? {
-            var parent = skipParentheses(rhs.getQualifiedParentOrThis().uastParent)
-
-            // Handle some types of chained calls; e.g. you might have
-            //    var = prefs.edit().put(key,value)
-            // and here we want to skip past the put call
-            if (allowChainedCalls) {
-                while (true) {
-                    if (parent is UQualifiedReferenceExpression) {
-                        val parentParent = skipParentheses(parent.uastParent)
-                        if (parentParent is UQualifiedReferenceExpression) {
-                            parent = skipParentheses(parentParent.uastParent)
-                        } else if (parentParent is UVariable || parentParent is UPolyadicExpression) {
-                            parent = parentParent
-                            break
-                        } else {
-                            break
-                        }
-                    } else {
-                        break
-                    }
-                }
-            }
-
-            if (parent != null && parent.isAssignment()) {
-                val assignment = parent as UBinaryExpression
-                val lhs = assignment.leftOperand
-                if (lhs is UReferenceExpression) {
-                    val resolved = lhs.resolve()
-                    if (resolved is PsiVariable && (allowFields || resolved !is PsiField)) {
-                        // e.g. local variable, parameter - but not a field
-                        return resolved
-                    }
-                }
-            } else if (parent is UVariable && (allowFields || parent !is UField)) {
-                // Handle elvis operators in Kotlin. A statement like this:
-                //   val transaction = f.beginTransaction() ?: return
-                // is turned into
-                //   var transaction: android.app.FragmentTransaction = elvis {
-                //       @org.jetbrains.annotations.NotNull var var8633f9d5: android.app.FragmentTransaction = f.beginTransaction()
-                //       if (var8633f9d5 != null) var8633f9d5 else return
-                //   }
-                // and here we want to record "transaction", not "var8633f9d5", as the variable
-                // to track.
-                if (parent.uastParent is UDeclarationsExpression &&
-                    parent.uastParent!!.uastParent is UExpressionList
-                ) {
-                    val exp = parent.uastParent!!.uastParent as UExpressionList
-                    val kind = exp.kind
-                    if (kind.name == "elvis" && exp.uastParent is UVariable) {
-                        parent = exp.uastParent
-                    }
-                }
-
-                return (parent as UVariable).psi
-            }
-
-            return null
-        }
     }
 }

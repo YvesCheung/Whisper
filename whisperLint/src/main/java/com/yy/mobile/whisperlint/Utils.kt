@@ -1,6 +1,6 @@
 package com.yy.mobile.whisperlint
 
-import com.android.tools.lint.detector.api.getMethodName
+import com.android.tools.lint.detector.api.LintUtils.getMethodName
 import com.intellij.psi.PsiElement
 import org.jetbrains.uast.UBinaryExpression
 import org.jetbrains.uast.UCallExpression
