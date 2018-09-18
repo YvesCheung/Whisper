@@ -14,6 +14,7 @@ import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.android.tools.lint.detector.api.getMethodName
 import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiClassType
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
@@ -32,6 +33,7 @@ import org.jetbrains.uast.UParameter
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
+import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.getContainingClass
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
@@ -205,8 +207,8 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 "be one of the following:\n" +
                 aimCls.joinToString { "- $it\n" },
             Category.CORRECTNESS,
-            5,
-            Severity.ERROR,
+            8,
+            Severity.WARNING,
             Implementation(
                 WhisperImmutableDetector::class.java,
                 EnumSet.of(Scope.JAVA_FILE)
@@ -220,11 +222,12 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             ISSUE_WHISPER_IMMUTABLE_TARGET)
     }
 
-    override fun getApplicableUastTypes(): List<Class<out UElement>> = listOf(
+    override fun getApplicableUastTypes() = listOf(
         UField::class.java,
         UCallExpression::class.java,
         USimpleNameReferenceExpression::class.java,
         UParameter::class.java,
+        UVariable::class.java,
         UMethod::class.java)
 
     private val checkFieldsToScope = mutableSetOf<Pair<PsiElement, UElement>>()
@@ -297,6 +300,13 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 }
             }
 
+            override fun visitVariable(node: UVariable) {
+                if (checkIsImmutable(node.annotations)) {
+                    val cls = (node.type as? PsiClassType)?.resolve()
+                    checkType(cls, node, node.type.canonicalText)
+                }
+            }
+
             override fun visitMethod(node: UMethod) {
                 val methods = node.findSuperMethods()
                 val currentIsImmutable = checkIsImmutable(node.annotations)
@@ -321,45 +331,48 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                             quickFix
                         )
                     }
+                } else { //is Immutable
+                    val cls = (node.returnType as? PsiClassType)?.resolve()
+                    checkType(cls, node, node.returnType?.canonicalText)
+                }
 
-                    val lintFlag = BooleanArray(node.parameters.size)
-                    val currentFlag = obtainIdxForImmutable(node)
-                    if (currentFlag.all { it }) {
-                        return
-                    }
-                    for (method in methods) {
-                        method.parameters.forEachIndexed { index, parameter ->
-                            if (!currentFlag[index]) {
-                                if (parameter is PsiParameter &&
-                                    checkIsImmutable(parameter)) {
-                                    currentFlag[index] = true
-                                    lintFlag[index] = true
-                                }
+                val lintFlag = BooleanArray(node.parameters.size)
+                val currentFlag = obtainIdxForImmutable(node)
+                if (currentFlag.all { it }) {
+                    return
+                }
+                for (method in methods) {
+                    method.parameters.forEachIndexed { index, parameter ->
+                        if (!currentFlag[index]) {
+                            if (parameter is PsiParameter &&
+                                checkIsImmutable(parameter)) {
+                                currentFlag[index] = true
+                                lintFlag[index] = true
                             }
-                        }
-                    }
-                    lintFlag.forEachIndexed { index, b ->
-                        if (b) {
-                            val param = node.parameters[index] as? PsiParameter ?: return
-                            val msg = "The parameter [${param.text}] without @Immutable cannot override " +
-                                "@Immutable parameter."
-                            val quickFix = LintFix.create()
-                                .replace()
-                                .name("add @Immutable annotation")
-                                .range(context.getLocation(param))
-                                .with("@$immutableAnnotation ${param.text}")
-                                .build()
-                            context.report(
-                                ISSUE_WHISPER_OVERRIDE_IMMUTABLE,
-                                param,
-                                context.getNameLocation(param),
-                                msg,
-                                quickFix
-                            )
                         }
                     }
                 }
 
+                lintFlag.forEachIndexed { index, b ->
+                    if (b) {
+                        val param = node.parameters[index] as? PsiParameter ?: return
+                        val msg = "The parameter [${param.text}] without @Immutable cannot override " +
+                            "@Immutable parameter."
+                        val quickFix = LintFix.create()
+                            .replace()
+                            .name("add @Immutable annotation")
+                            .range(context.getLocation(param))
+                            .with("@$immutableAnnotation ${param.text}")
+                            .build()
+                        context.report(
+                            ISSUE_WHISPER_OVERRIDE_IMMUTABLE,
+                            param,
+                            context.getNameLocation(param),
+                            msg,
+                            quickFix
+                        )
+                    }
+                }
             }
 
             private fun obtainIdxForImmutable(method: PsiMethod): BooleanArray {
@@ -368,6 +381,23 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                     flagArray[index] = parameter is PsiParameter && checkIsImmutable(parameter)
                 }
                 return flagArray
+            }
+
+            private fun checkType(cls: PsiClass?, node: UElement, currentMsg: String?) {
+                val evaluator = context.evaluator
+
+                fun clsExtendIt(superCls: String): Boolean =
+                    evaluator.extendsClass(cls, superCls, false)
+
+                if (cls == null || !aimCls.any(::clsExtendIt)) {
+                    val msg = "Only class $aimCls or their subclass can be annotated by @Immutable. " +
+                        "\nbut current is [$currentMsg]"
+                    context.report(
+                        ISSUE_WHISPER_IMMUTABLE_TARGET,
+                        node,
+                        context.getNameLocation(node),
+                        msg)
+                }
             }
         }
     }

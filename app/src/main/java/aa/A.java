@@ -4,41 +4,23 @@ import android.support.annotation.Nullable;
 
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Set;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 public class A {
 
     @Immutable
-    public List<String> a() {
-        return new ArrayList<>();
-    }
+    private int a = 3;
 
-    public List<String> b() {
-        return new LinkedList<>();
+    @Immutable
+    private final StringBuilder sb = new StringBuilder();
+
+    @Nullable
+    @Immutable
+    private final ConcurrentLinkedDeque a() {
+        return null;
     }
 
     @Immutable
-    protected List<String> c() {
-        return a();
-    }
-
-    public void d(@Immutable @Nullable List<String> a) {
-        //do nothing
-    }
-
-    public void e(List<String> a) {
-        //do nothing
-    }
-
-    void f(List<String> a) {
-        //do nothing
-    }
-
-    @Immutable
-    private Set<String> g(@Immutable Set<String> set){
-        return set;
+    private final void b() {
     }
 }

@@ -2084,4 +2084,53 @@ class WhisperImmutableTest {
                 "-     public void d(List<String> a) { //should lint\n" +
                 "+     public void d(@com.yy.mobile.whisper.Immutable List<String> a) { //should lint")
     }
+
+    @Test
+    fun `Check Java wrong type for @Immutable`(){
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import android.support.annotation.Nullable;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.concurrent.ConcurrentLinkedDeque;
+
+                public class A {
+
+                    @Immutable
+                    private int a = 3;
+
+                    @Immutable
+                    private final StringBuilder sb = new StringBuilder();
+
+                    @Nullable
+                    @Immutable
+                    private final ConcurrentLinkedDeque a() {
+                        return null;
+                    }
+
+                    @Immutable
+                    private final void b() {
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:12: Warning: Only class [java.util.Collection, java.util.Map, java.util.Map.Entry, java.util.Iterator] or their subclass can be annotated by @Immutable. \n" +
+                "but current is [int] [ImmutableTarget]\n" +
+                "    private int a = 3;\n" +
+                "                ~\n" +
+                "src/aa/A.java:15: Warning: Only class [java.util.Collection, java.util.Map, java.util.Map.Entry, java.util.Iterator] or their subclass can be annotated by @Immutable. \n" +
+                "but current is [java.lang.StringBuilder] [ImmutableTarget]\n" +
+                "    private final StringBuilder sb = new StringBuilder();\n" +
+                "                                ~~\n" +
+                "src/aa/A.java:24: Warning: Only class [java.util.Collection, java.util.Map, java.util.Map.Entry, java.util.Iterator] or their subclass can be annotated by @Immutable. \n" +
+                "but current is [void] [ImmutableTarget]\n" +
+                "    private final void b() {\n" +
+                "                       ~\n" +
+                "0 errors, 3 warnings")
+    }
 }
