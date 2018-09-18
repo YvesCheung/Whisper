@@ -1735,14 +1735,14 @@ class WhisperImmutableTest {
             """.trimIndent()))
             .detector(WhisperImmutableDetector())
             .run()
-            .expect("src/aa/A.java:20: Error: this parameter [queue] is mutable. [ImmutableEscape]\n" +
+            .expect("src/aa/A.java:20: Error: The method [c(que)] is called but this parameter [queue] is mutable. [ImmutableEscape]\n" +
                 "    public void c(Queue<Long> queue) {\n" +
                 "                  ~~~~~~~~~~~~~~~~~\n" +
-                "    src/aa/A.java:16: Unable to pass an immutable object [que] to a mutable parameter [c(que)].\n" +
-                "src/aa/A.java:39: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "    src/aa/A.java:16: Unable to pass an immutable object [que] to a mutable parameter [void c(Queue<Long> queue))\n" +
+                "src/aa/A.java:39: Error: The method [e(map)] is called but this parameter [map] is mutable. [ImmutableEscape]\n" +
                 "    public void e(Map<String, String> map) {\n" +
                 "                  ~~~~~~~~~~~~~~~~~~~~~~~\n" +
-                "    src/aa/A.java:36: Unable to pass an immutable object [map] to a mutable parameter [e(map)].\n" +
+                "    src/aa/A.java:36: Unable to pass an immutable object [map] to a mutable parameter [void e(Map<String, String> map))\n" +
                 "2 errors, 0 warnings")
             .expectFixDiffs("Fix for src/aa/A.java line 20: Annotate parameter [Queue<Long> queue] with @Immutable:\n" +
                 "@@ -20 +20\n" +
@@ -1823,18 +1823,18 @@ class WhisperImmutableTest {
                 "    Collection<String> list = map.values(); //should lint\n" +
                 "    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
                 "    src/aa/A.java:16: This expression [map.values()] is immutable.\n" +
-                "src/aa/A.java:25: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "src/aa/A.java:25: Error: The method [b(map)] is called but this parameter [map] is mutable. [ImmutableEscape]\n" +
                 "    public void b(Map<String, String> map) {\n" +
                 "                  ~~~~~~~~~~~~~~~~~~~~~~~\n" +
-                "    src/aa/A.java:22: Unable to pass an immutable object [map] to a mutable parameter [b(map)].\n" +
-                "src/aa/A.java:25: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "    src/aa/A.java:22: Unable to pass an immutable object [map] to a mutable parameter [void b(Map<String, String> map))\n" +
+                "src/aa/A.java:25: Error: The method [b(this.map)] is called but this parameter [map] is mutable. [ImmutableEscape]\n" +
                 "    public void b(Map<String, String> map) {\n" +
                 "                  ~~~~~~~~~~~~~~~~~~~~~~~\n" +
-                "    src/aa/B.java:10: Unable to pass an immutable object [this.map] to a mutable parameter [b(this.map)].\n" +
-                "src/aa/B.java:9: Error: this parameter [map] is mutable. [ImmutableEscape]\n" +
+                "    src/aa/B.java:10: Unable to pass an immutable object [this.map] to a mutable parameter [void b(Map<String, String> map))\n" +
+                "src/aa/B.java:9: Error: The method [d(this.map)] is called but this parameter [map] is mutable. [ImmutableEscape]\n" +
                 "    public void d(Map<String, ? extends CharSequence> map) {\n" +
                 "                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
-                "    src/aa/B.java:16: Unable to pass an immutable object [this.map] to a mutable parameter [d(this.map)].\n" +
+                "    src/aa/B.java:16: Unable to pass an immutable object [this.map] to a mutable parameter [void d(Map<String, ? extends CharSequence> map))\n" +
                 "4 errors, 0 warnings")
             .expectFixDiffs("Fix for src/aa/A.java line 16: Annotate [list] with @Immutable:\n" +
                 "@@ -16 +16\n" +
@@ -1854,100 +1854,234 @@ class WhisperImmutableTest {
                 "+     public void d(@com.yy.mobile.whisper.Immutable Map<String, ? extends CharSequence> map) {")
     }
 
-//    @Test
-//    fun `Check Java method return @Immutable to argument`() {
-//
-//        TestLintTask.lint().files(
-//            immutableAnnotation,
-//            java("""
-//                package aa;
-//
-//                import com.yy.mobile.whisper.Immutable;
-//
-//                import java.util.*;
-//
-//                public class A {
-//
-//
-//                }
-//            """.trimIndent()),
-//            java("""
-//                package aa;
-//
-//                import com.yy.mobile.whisper.Immutable;
-//
-//                import java.util.*;
-//
-//                public class B {
-//
-//                }
-//            """.trimIndent()))
-//            .detector(WhisperImmutableDetector())
-//            .run()
-//            .expect("")
-//            .expectFixDiffs("")
-//    }
+    @Test
+    fun `Check Java method return @Immutable to argument`() {
 
-//    @Test
-//    fun `Check Java method or argument @Immutable to override`() {
-//
-//        TestLintTask.lint().files(
-//            immutableAnnotation,
-//            java("""
-//                package aa;
-//
-//                import com.yy.mobile.whisper.Immutable;
-//
-//                import java.util.*;
-//
-//                public class A {
-//
-//                    public List<Integer> a(@Immutable LinkedList<Integer> list) { //should lint
-//                        return list;
-//                    }
-//
-//                    public LinkedList<Integer> b(@Immutable LinkedList<Integer> list) {  //should lint
-//                        LinkedList<Integer> local = list;
-//                        for (Integer i : local) {
-//                            System.out.println(i);
-//                        }
-//                        return local;
-//                    }
-//
-//                    private Set<String> c(Set<String> set) { //should not lint
-//                        return set;
-//                    }
-//
-//                    @Immutable
-//                    private Set<String> d(@Immutable Set<String> set) { //should not lint
-//                        return set;
-//                    }
-//
-//                    @Immutable
-//                    private Collection<String> d(@Immutable Map<Integer, String> set) { //should not lint
-//                        return set.values();
-//                    }
-//
-//                    @Immutable
-//                    private Set<Integer> e(Map<Integer, String> set) { //should not lint
-//                        return set.keySet();
-//                    }
-//                }
-//            """.trimIndent()),
-//            java("""
-//                package aa;
-//
-//                import com.yy.mobile.whisper.Immutable;
-//
-//                import java.util.*;
-//
-//                public class B {
-//
-//                }
-//            """.trimIndent()))
-//            .detector(WhisperImmutableDetector())
-//            .run()
-//            .expect("")
-//            .expectFixDiffs("")
-//    }
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    public List<String> a() {
+                        return new ArrayList<>();
+                    }
+
+                    public void b(List<String> list) { //should lint
+                        Log.i("haha", "list = " + list);
+                    }
+
+                    private void c() {
+                        b(a()); //lint
+                    }
+
+                    protected void c(List<String> list) { //should lint
+                        d();
+
+                        e(list);
+                    }
+
+                    public void d() {
+                        List<String> list = a();
+                        if (list instanceof ArrayList) {
+                            b(list); //lint
+
+                            e(list);
+                        }
+                    }
+
+                    private void e(@Immutable List<String> list) {
+                        c();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B extends A {
+
+                    public void e() {
+                        c(a()); //lint
+
+                        Collection<String> values = newMap().values();
+                        b(new ArrayList<>(values));
+                    }
+
+                    @Immutable
+                    public Map<String, String> newMap() {
+                        e();
+                        return new TreeMap<>();
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/A.java:14: Error: The method [b(a())] is called but this parameter [list] is mutable. [ImmutableEscape]\n" +
+                "    public void b(List<String> list) { //should lint\n" +
+                "                  ~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:19: Unable to pass an immutable object [a()] to a mutable parameter [void b(List<String> list))\n" +
+                "src/aa/A.java:14: Error: The method [b(list)] is called but this parameter [list] is mutable. [ImmutableEscape]\n" +
+                "    public void b(List<String> list) { //should lint\n" +
+                "                  ~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/A.java:31: Unable to pass an immutable object [list] to a mutable parameter [void b(List<String> list))\n" +
+                "src/aa/A.java:22: Error: The method [c(a())] is called but this parameter [list] is mutable. [ImmutableEscape]\n" +
+                "    protected void c(List<String> list) { //should lint\n" +
+                "                     ~~~~~~~~~~~~~~~~~\n" +
+                "    src/aa/B.java:10: Unable to pass an immutable object [a()] to a mutable parameter [void c(List<String> list))\n" +
+                "3 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/A.java line 14: Annotate parameter [List<String> list] with @Immutable:\n" +
+                "@@ -14 +14\n" +
+                "-     public void b(List<String> list) { //should lint\n" +
+                "+     public void b(@com.yy.mobile.whisper.Immutable List<String> list) { //should lint\n" +
+                "Fix for src/aa/A.java line 14: Annotate parameter [List<String> list] with @Immutable:\n" +
+                "@@ -14 +14\n" +
+                "-     public void b(List<String> list) { //should lint\n" +
+                "+     public void b(@com.yy.mobile.whisper.Immutable List<String> list) { //should lint\n" +
+                "Fix for src/aa/A.java line 22: Annotate parameter [List<String> list] with @Immutable:\n" +
+                "@@ -22 +22\n" +
+                "-     protected void c(List<String> list) { //should lint\n" +
+                "+     protected void c(@com.yy.mobile.whisper.Immutable List<String> list) { //should lint")
+    }
+
+    @Test
+    fun `Check Java method or argument @Immutable to override`() {
+
+        TestLintTask.lint().files(
+            immutableAnnotation,
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class A {
+
+                    @Immutable
+                    public List<String> a() {
+                        return new ArrayList<>();
+                    }
+
+                    public List<String> b() {
+                        return new LinkedList<>();
+                    }
+
+                    @Immutable
+                    protected List<String> c() {
+                        return a();
+                    }
+
+                    public void d(@Immutable List<String> a) {
+                        //do nothing
+                    }
+
+                    public void e(List<String> a) {
+                        //do nothing
+                    }
+
+                    void f(List<String> a) {
+                        //do nothing
+                    }
+
+                    @Immutable
+                    private Set<String> g(@Immutable Set<String> set){
+                        return set;
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa;
+
+                import com.yy.mobile.whisper.Immutable;
+
+                import java.util.*;
+
+                public class B extends A {
+
+                    @Override
+                    public List<String> a() { //should lint
+                        return super.a();
+                    }
+
+                    @Override
+                    public List<String> b() { //should not lint
+                        return super.b();
+                    }
+
+                    @Override
+                    protected List<String> c() { //should lint
+                        return super.c();
+                    }
+
+                    @Override
+                    public void d(List<String> a) { //should lint
+                        super.d(a);
+                    }
+
+                    @Override
+                    public void e(List<String> a) { //should not lint
+                        super.e(a);
+                    }
+
+                    @Override
+                    void f(List<String> a) { //should not lint
+                        super.f(a);
+                    }
+
+                    private Set<String> g(Set<String> set) { //should not lint
+                        return set;
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperImmutableDetector())
+            .run()
+            .expect("src/aa/B.java:10: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    public List<String> a() { //should lint\n" +
+                "                        ~\n" +
+                "    src/aa/B.java:11: This expression [return super.a();] is immutable.\n" +
+                "src/aa/B.java:20: Error: Unable to return an immutable expression within a method without @Immutable annotation. [ImmutableEscape]\n" +
+                "    protected List<String> c() { //should lint\n" +
+                "                           ~\n" +
+                "    src/aa/B.java:21: This expression [return super.c();] is immutable.\n" +
+                "src/aa/B.java:10: Error: The method [java.util.List<java.lang.String> a()] without @Immutable cannot override @Immutable method. [ImmutableOverride]\n" +
+                "    public List<String> a() { //should lint\n" +
+                "                        ~\n" +
+                "src/aa/B.java:20: Error: The method [java.util.List<java.lang.String> c()] without @Immutable cannot override @Immutable method. [ImmutableOverride]\n" +
+                "    protected List<String> c() { //should lint\n" +
+                "                           ~\n" +
+                "src/aa/B.java:25: Error: The parameter [List<String> a] without @Immutable cannot override @Immutable parameter. [ImmutableOverride]\n" +
+                "    public void d(List<String> a) { //should lint\n" +
+                "                  ~~~~~~~~~~~~~~\n" +
+                "5 errors, 0 warnings")
+            .expectFixDiffs("Fix for src/aa/B.java line 10: Annotate method [a] with @Immutable:\n" +
+                "@@ -9 +9\n" +
+                "-     @Override\n" +
+                "+     @com.yy.mobile.whisper.Immutable @Override\n" +
+                "Fix for src/aa/B.java line 20: Annotate method [c] with @Immutable:\n" +
+                "@@ -19 +19\n" +
+                "-     @Override\n" +
+                "+     @com.yy.mobile.whisper.Immutable @Override\n" +
+                "Fix for src/aa/B.java line 10: add @Immutable annotation:\n" +
+                "@@ -9 +9\n" +
+                "-     @Override\n" +
+                "+     @com.yy.mobile.whisper.Immutable @Override\n" +
+                "Fix for src/aa/B.java line 20: add @Immutable annotation:\n" +
+                "@@ -19 +19\n" +
+                "-     @Override\n" +
+                "+     @com.yy.mobile.whisper.Immutable @Override\n" +
+                "Fix for src/aa/B.java line 25: add @Immutable annotation:\n" +
+                "@@ -25 +25\n" +
+                "-     public void d(List<String> a) { //should lint\n" +
+                "+     public void d(@com.yy.mobile.whisper.Immutable List<String> a) { //should lint")
+    }
 }

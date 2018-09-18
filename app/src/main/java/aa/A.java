@@ -1,34 +1,44 @@
 package aa;
 
+import android.support.annotation.Nullable;
+
 import com.yy.mobile.whisper.Immutable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 
 public class A {
 
     @Immutable
-    protected Map<String, String> map = new HashMap<String, String>() {
-        {
-            put("a", "b");
-        }
-    };
-
-    Collection<String> list = map.values(); //should lint
-
-    public void a(@Immutable Collection<String> list) {
-        for (String a : list) {
-            System.out.println(a);
-        }
-        b(map); //should lint
+    public List<String> a() {
+        return new ArrayList<>();
     }
 
-    public void b(Map<String, String> map) {
-        c(this.map);
-        throw new RuntimeException(map.keySet().toString());
+    public List<String> b() {
+        return new LinkedList<>();
     }
 
-    public void c(@Immutable Map<? extends CharSequence, String> map) {
-        a(map.values());
-        a(list);
+    @Immutable
+    protected List<String> c() {
+        return a();
+    }
+
+    public void d(@Immutable @Nullable List<String> a) {
+        //do nothing
+    }
+
+    public void e(List<String> a) {
+        //do nothing
+    }
+
+    void f(List<String> a) {
+        //do nothing
+    }
+
+    @Immutable
+    private Set<String> g(@Immutable Set<String> set){
+        return set;
     }
 }

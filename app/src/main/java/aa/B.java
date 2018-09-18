@@ -1,19 +1,41 @@
 package aa;
 
-import com.yy.mobile.whisper.Immutable;
-
-import java.util.*;
+import java.util.List;
+import java.util.Set;
 
 public class B extends A {
 
-    public void d(Map<String, ? extends CharSequence> map) {
-        b(this.map); //should lint
-        e(this.map.values());
-        e(map.values());
+    @Override
+    public List<String> a() {
+        return super.a();
     }
 
-    public void e(@Immutable Collection<? extends CharSequence> collection) {
-        d(this.map); //should lint
-        d(new HashMap<>(this.map));
+    @Override
+    public List<String> b() {
+        return super.b();
+    }
+
+    @Override
+    protected List<String> c() {
+        return super.c();
+    }
+
+    @Override
+    public void d(List<String> a) {
+        super.d(a);
+    }
+
+    @Override
+    public void e(List<String> a) {
+        super.e(a);
+    }
+
+    @Override
+    void f(List<String> a) {
+        super.f(a);
+    }
+
+    private Set<String> g(Set<String> set) {
+        return set;
     }
 }

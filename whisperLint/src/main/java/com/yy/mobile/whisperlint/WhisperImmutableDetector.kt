@@ -24,15 +24,14 @@ import com.intellij.psi.impl.source.PsiClassReferenceType
 import org.jetbrains.uast.UAnnotated
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
-import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UField
+import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UParameter
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
-import org.jetbrains.uast.asRecursiveLogString
 import org.jetbrains.uast.getContainingClass
 import org.jetbrains.uast.getContainingUClass
 import org.jetbrains.uast.getContainingUFile
@@ -49,34 +48,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
     companion object {
 
-        val ISSUE_WHISPER_IMMUTABLE: Issue = Issue.create(
-            "ImmutableObject",
-            "The reference annotated by @Immutable should not be modified.",
-            "Iterator, Entry, Collection, Map that annotated by @Immutable cannot be " +
-                "modified.",
-            Category.CORRECTNESS,
-            7,
-            Severity.ERROR,
-            Implementation(
-                WhisperImmutableDetector::class.java,
-                EnumSet.of(Scope.JAVA_FILE)
-            ))
-
-        val ISSUE_WHISPER_MISSING_IMMUTABLE: Issue = Issue.create(
-            "ImmutableEscape",
-            "The reference annotated by @Immutable has escaped.",
-            "Can not assign an immutable object to a mutable object.",
-            Category.CORRECTNESS,
-            7,
-            Severity.ERROR,
-            Implementation(
-                WhisperImmutableDetector::class.java,
-                EnumSet.of(Scope.JAVA_FILE)
-            ))
-
         private const val immutableAnnotation = "$AnnotationPkg.Immutable"
-
-        fun getIssue() = arrayOf(ISSUE_WHISPER_IMMUTABLE)
 
         private val checkReturnMethods = setOf(
             "iterator",
@@ -186,25 +158,83 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             entryCls,
             iteratorCls
         )
+
+        val ISSUE_WHISPER_IMMUTABLE: Issue = Issue.create(
+            "ImmutableObject",
+            "The reference annotated by @Immutable should not be modified.",
+            "Iterator, Entry, Collection, Map that annotated by @Immutable cannot be " +
+                "modified.",
+            Category.CORRECTNESS,
+            7,
+            Severity.ERROR,
+            Implementation(
+                WhisperImmutableDetector::class.java,
+                EnumSet.of(Scope.JAVA_FILE)
+            ))
+
+        val ISSUE_WHISPER_MISSING_IMMUTABLE: Issue = Issue.create(
+            "ImmutableEscape",
+            "The reference annotated by @Immutable has escaped.",
+            "Can not assign an immutable object to a mutable object.",
+            Category.CORRECTNESS,
+            7,
+            Severity.ERROR,
+            Implementation(
+                WhisperImmutableDetector::class.java,
+                EnumSet.of(Scope.JAVA_FILE)
+            ))
+
+        val ISSUE_WHISPER_OVERRIDE_IMMUTABLE: Issue = Issue.create(
+            "ImmutableOverride",
+            "The method or parameter should annotate with @Immutable.",
+            "The method in the super class inherited by this method has " +
+                "the return value or parameter annotated by @Immutable. Please annotate " +
+                "this method with @Immutable too.",
+            Category.CORRECTNESS,
+            6,
+            Severity.ERROR,
+            Implementation(
+                WhisperImmutableDetector::class.java,
+                EnumSet.of(Scope.JAVA_FILE)
+            ))
+
+        val ISSUE_WHISPER_IMMUTABLE_TARGET: Issue = Issue.create(
+            "ImmutableTarget",
+            "Types that cannot be annotated by @Immutable.",
+            "The class or super class of target annotated by @Immutable must " +
+                "be one of the following:\n" +
+                aimCls.joinToString { "- $it\n" },
+            Category.CORRECTNESS,
+            5,
+            Severity.ERROR,
+            Implementation(
+                WhisperImmutableDetector::class.java,
+                EnumSet.of(Scope.JAVA_FILE)
+            )
+        )
+
+        fun getIssue() = arrayOf(
+            ISSUE_WHISPER_IMMUTABLE,
+            ISSUE_WHISPER_MISSING_IMMUTABLE,
+            ISSUE_WHISPER_OVERRIDE_IMMUTABLE,
+            ISSUE_WHISPER_IMMUTABLE_TARGET)
     }
 
     override fun getApplicableUastTypes(): List<Class<out UElement>> = listOf(
-        UClass::class.java,
         UField::class.java,
         UCallExpression::class.java,
         USimpleNameReferenceExpression::class.java,
-        UParameter::class.java)
+        UParameter::class.java,
+        UMethod::class.java)
 
     private val checkFieldsToScope = mutableSetOf<Pair<PsiElement, UElement>>()
 
     private val reportFieldsToAssignment = mutableSetOf<Pair<PsiField, UElement>>()
 
+    private val reportArgumentToFunction = mutableSetOf<Pair<UElement, UCallExpression>>()
+
     override fun createUastHandler(context: JavaContext): UElementHandler? {
         return object : UElementHandler() {
-
-            override fun visitClass(node: UClass) {
-                System.out.println(node.asRecursiveLogString())
-            }
 
             override fun visitField(node: UField) {
 
@@ -266,12 +296,86 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                     node.sourcePsi?.let { checkFieldsToScope.add(it to scope) }
                 }
             }
+
+            override fun visitMethod(node: UMethod) {
+                val methods = node.findSuperMethods()
+                val currentIsImmutable = checkIsImmutable(node.annotations)
+                if (!currentIsImmutable) {
+                    val superIsImmutable = methods.any { checkIsImmutable(it) }
+                    if (superIsImmutable) {
+                        val msg = "The method [${node.getSign()}] without @Immutable cannot override " +
+                            "@Immutable method."
+                        val quickFix = LintFix.create()
+                            .replace()
+                            .name("add @Immutable annotation")
+                            .range(context.getLocation(node))
+                            .with("@$immutableAnnotation ${node.asSourceString()}")
+                            .shortenNames()
+                            .reformat(true)
+                            .build()
+                        context.report(
+                            ISSUE_WHISPER_OVERRIDE_IMMUTABLE,
+                            node,
+                            context.getNameLocation(node),
+                            msg,
+                            quickFix
+                        )
+                    }
+
+                    val lintFlag = BooleanArray(node.parameters.size)
+                    val currentFlag = obtainIdxForImmutable(node)
+                    if (currentFlag.all { it }) {
+                        return
+                    }
+                    for (method in methods) {
+                        method.parameters.forEachIndexed { index, parameter ->
+                            if (!currentFlag[index]) {
+                                if (parameter is PsiParameter &&
+                                    checkIsImmutable(parameter)) {
+                                    currentFlag[index] = true
+                                    lintFlag[index] = true
+                                }
+                            }
+                        }
+                    }
+                    lintFlag.forEachIndexed { index, b ->
+                        if (b) {
+                            val param = node.parameters[index] as? PsiParameter ?: return
+                            val msg = "The parameter [${param.text}] without @Immutable cannot override " +
+                                "@Immutable parameter."
+                            val quickFix = LintFix.create()
+                                .replace()
+                                .name("add @Immutable annotation")
+                                .range(context.getLocation(param))
+                                .with("@$immutableAnnotation ${param.text}")
+                                .build()
+                            context.report(
+                                ISSUE_WHISPER_OVERRIDE_IMMUTABLE,
+                                param,
+                                context.getNameLocation(param),
+                                msg,
+                                quickFix
+                            )
+                        }
+                    }
+                }
+
+            }
+
+            private fun obtainIdxForImmutable(method: PsiMethod): BooleanArray {
+                val flagArray = BooleanArray(method.parameters.size)
+                method.parameters.forEachIndexed { index, parameter ->
+                    flagArray[index] = parameter is PsiParameter && checkIsImmutable(parameter)
+                }
+                return flagArray
+            }
         }
     }
 
     override fun beforeCheckFile(context: Context) {
         checkFieldsToScope.clear()
         reportFieldsToAssignment.clear()
+        reportArgumentToFunction.clear()
     }
 
     override fun afterCheckFile(context: Context) {
@@ -283,6 +387,9 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
 
             reportFieldsToAssignment.forEach { (field, assignment) ->
                 reportField(context, assignment, field)
+            }
+            reportArgumentToFunction.forEach { (argument, function) ->
+                reportArgument(context, function, argument)
             }
         }
     }
@@ -333,8 +440,6 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             override fun visitElement(node: UElement) = abort || super.visitElement(node)
 
             override fun receiver(call: UCallExpression) {
-                System.out.println("receiver = $call class = ${call.resolve()?.containingClass}")
-
                 if (checkReturnMethods.contains(getMethodName(call))) {
                     val (iteIns, iteRef, iteProp) = call.getAvailableReturnValue()
                     this.instances.addAll(iteIns)
@@ -360,14 +465,12 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             }
 
             override fun field(assignment: UElement?, field: PsiField) {
-                System.out.println("field = $field assign = ${assignment?.asSourceString()}")
                 if (assignment != null && !checkIsImmutable(field)) {
                     reportFieldsToAssignment.add(field to assignment)
                 }
             }
 
             override fun returns(expression: UReturnExpression) {
-                System.out.println("return = $expression")
                 val method = expression.getContainingUMethod() ?: return
                 if (!checkIsImmutable(method as PsiModifierListOwner)) {
                     abort = true
@@ -394,40 +497,58 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             }
 
             override fun argument(call: UCallExpression, reference: UElement) {
-                System.out.println("argument = $call $reference")
-                val method = call.resolve() ?: return
-                val paramIndex = call.valueArguments.indexOf(reference)
-                val param = method.parameters.getOrNull(paramIndex) as? PsiParameter ?: return
-                val paramCls = (param.type as? PsiClassReferenceType)?.resolve() ?: return
-                val refLocation = context.getLocation(param)
-                if (refLocation.start == null || refLocation.end == null) return
-                if (!context.checkIsAimClass(paramCls)) {
-                    return
-                }
-                val paramName = param.name
-                if (!checkIsImmutable(param as PsiModifierListOwner)) {
-                    val msg = "Unable to pass an immutable object [${reference.asSourceString()}] " +
-                        "to a mutable parameter [${call.asSourceString()}]."
-                    val callLocation = context.getCallLocation(call, true, true)
-
-                    val refMsg = "this parameter [$paramName] is mutable."
-                    val quickFix = LintFix.create()
-                        .name("Annotate parameter [${param.text}] with @Immutable")
-                        .replace()
-                        .range(refLocation)
-                        .with("@$immutableAnnotation ${param.text}")
-                        .reformat(true)
-                        .shortenNames()
-                        .build()
-
-                    context.report(ISSUE_WHISPER_MISSING_IMMUTABLE,
-                        call,
-                        refLocation.withSecondary(callLocation, msg),
-                        refMsg,
-                        quickFix)
-                }
+                reportArgumentToFunction.add(reference to call)
             }
         })
+    }
+
+    private fun reportArgument(
+        context: JavaContext,
+        call: UCallExpression,
+        reference: UElement
+    ) {
+        val method = call.resolve() ?: return
+        val paramIndex = call.valueArguments.indexOf(reference)
+        val param = method.parameters.getOrNull(paramIndex) as? PsiParameter ?: return
+        val paramCls = (param.type as? PsiClassReferenceType)?.resolve() ?: return
+        val refLocation = context.getLocation(param)
+        if (refLocation.start == null || refLocation.end == null) return
+        if (!context.checkIsAimClass(paramCls)) {
+            return
+        }
+        val paramName = param.name
+        if (!checkIsImmutable(param as PsiModifierListOwner)) {
+            val refMsg = "Unable to pass an immutable object [${reference.asSourceString()}] " +
+                "to a mutable parameter [${method.getSign()})"
+            val callLocation = context.getCallLocation(call, true, true)
+            val msg = "The method [${call.asSourceString()}] is called but this parameter " +
+                "[$paramName] is mutable."
+            val quickFix = LintFix.create()
+                .name("Annotate parameter [${param.text}] with @Immutable")
+                .replace()
+                .range(refLocation)
+                .with("@$immutableAnnotation ${param.text}")
+                .reformat(true)
+                .shortenNames()
+                .build()
+
+            context.report(ISSUE_WHISPER_MISSING_IMMUTABLE,
+                call,
+                refLocation.withSecondary(callLocation, refMsg),
+                msg,
+                quickFix)
+        }
+    }
+
+    private fun PsiMethod.getSign(): String {
+        val returnType = this.returnType?.canonicalText ?: "fun"
+        val methodName = this.name
+        val parameterList = this.parameters.joinToString {
+            (it as? PsiParameter)?.text
+                ?: it.name
+                ?: ""
+        }
+        return "$returnType $methodName($parameterList)"
     }
 
     private fun reportField(
