@@ -22,6 +22,7 @@ import com.intellij.psi.PsiModifierListOwner
 import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiVariable
 import com.intellij.psi.impl.source.PsiClassReferenceType
+import org.jetbrains.kotlin.psi.psiUtil.parameterIndex
 import org.jetbrains.uast.UAnnotated
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
@@ -161,7 +162,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             iteratorCls
         )
 
-        val ISSUE_WHISPER_IMMUTABLE: Issue = Issue.create(
+        val ISSUE_WHISPER_IMMUTABLE: Issue = IssueFactory.create(
             "ImmutableObject",
             "The reference annotated by @Immutable should not be modified.",
             "Iterator, Entry, Collection, Map that annotated by @Immutable cannot be " +
@@ -174,7 +175,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_MISSING_IMMUTABLE: Issue = Issue.create(
+        val ISSUE_WHISPER_MISSING_IMMUTABLE: Issue = IssueFactory.create(
             "ImmutableEscape",
             "The reference annotated by @Immutable has escaped.",
             "Can not assign an immutable object to a mutable object.",
@@ -186,7 +187,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_OVERRIDE_IMMUTABLE: Issue = Issue.create(
+        val ISSUE_WHISPER_OVERRIDE_IMMUTABLE: Issue = IssueFactory.create(
             "ImmutableOverride",
             "The method or parameter should annotate with @Immutable.",
             "The method in the super class inherited by this method has " +
@@ -200,7 +201,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_IMMUTABLE_TARGET: Issue = Issue.create(
+        val ISSUE_WHISPER_IMMUTABLE_TARGET: Issue = IssueFactory.create(
             "ImmutableTarget",
             "Types that cannot be annotated by @Immutable.",
             "The class or super class of target annotated by @Immutable must " +

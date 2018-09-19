@@ -13,7 +13,7 @@ import com.yy.mobile.whisper.DeprecatedBy;
 public class ClassNeedToDeprecate {
 
     @DeprecatedBy(
-            replaceWith = "newMethod(%$2s, %$1s, null)",
+            replaceWith = "newMethod(%2$s, %1$s, null)",
             message = "This method is deprecated, use newMethod() instead.",
             level = DeprecatedBy.Level.Error
     )

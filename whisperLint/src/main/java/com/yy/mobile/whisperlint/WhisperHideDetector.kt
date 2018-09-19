@@ -26,7 +26,7 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
 
     companion object {
 
-        val ISSUE_WHISPER_HIDE: Issue = Issue.create(
+        val ISSUE_WHISPER_HIDE: Issue = IssueFactory.create(
             "HideMember",
             "Methods/Fields that can only be accessed in specified classes.",
             "This method/field is partially visible. And can only be accessed in the class, " +

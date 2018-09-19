@@ -28,7 +28,7 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
 
     companion object {
 
-        val ISSUE_WHISPER_WARNING: Issue = Issue.create(
+        val ISSUE_WHISPER_WARNING: Issue = IssueFactory.create(
             "WhisperWarning",
             "Warning hints provided by the whisper lib.",
             "The corresponding message is provided by @NeedWarning annotation method or field",
@@ -40,7 +40,7 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_ERROR: Issue = Issue.create(
+        val ISSUE_WHISPER_ERROR: Issue = IssueFactory.create(
             "WhisperError",
             "Error message provided by the whisper lib.",
             "The corresponding message is provided by @NeedError annotation method or field",
@@ -52,7 +52,7 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_INFO: Issue = Issue.create(
+        val ISSUE_WHISPER_INFO: Issue = IssueFactory.create(
             "WhisperInfo",
             "Message provided by the whisper lib.",
             "The corresponding message is provided by @NeedInfo annotation method or field",

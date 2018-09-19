@@ -33,7 +33,7 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
 
     companion object {
 
-        val ISSUE_WHISPER_USE_WITH: Issue = Issue.create(
+        val ISSUE_WHISPER_USE_WITH: Issue = IssueFactory.create(
             "MissingUsage",
             "The Method should be used with the another method specified by @UseWith.",
             "You can not just invoke this method without using the method specified by the " +
@@ -46,7 +46,7 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_USE_WITH_WRONG_METHOD: Issue = Issue.create(
+        val ISSUE_WHISPER_USE_WITH_WRONG_METHOD: Issue = IssueFactory.create(
             "MissingMethod",
             "The method specified by @UseWith is absent.",
             "You should check if the method name is spelling wrong. This method should be " +
