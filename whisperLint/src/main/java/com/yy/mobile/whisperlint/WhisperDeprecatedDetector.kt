@@ -27,7 +27,7 @@ class WhisperDeprecatedDetector : Detector(), Detector.UastScanner {
 
     companion object {
 
-        val ISSUE_WHISPER_DEPRECATED_WARNING: Issue = IssueFactory.create(
+        val ISSUE_WHISPER_DEPRECATED_WARNING: Issue = Issue.create(
             "DeprecatedWarning",
             "deprecated methods",
             "The methods are outdated. Please replace them with the new ones.",
@@ -39,7 +39,7 @@ class WhisperDeprecatedDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_DEPRECATED_ERROR: Issue = IssueFactory.create(
+        val ISSUE_WHISPER_DEPRECATED_ERROR: Issue = Issue.create(
             "DeprecatedError",
             "deprecated methods",
             "The methods are outdated. Please replace them with the new ones.",

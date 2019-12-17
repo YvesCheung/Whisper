@@ -162,7 +162,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
             iteratorCls
         )
 
-        val ISSUE_WHISPER_IMMUTABLE: Issue = IssueFactory.create(
+        val ISSUE_WHISPER_IMMUTABLE: Issue = Issue.create(
             "ImmutableObject",
             "The reference annotated by @Immutable should not be modified.",
             "Iterator, Entry, Collection, Map that annotated by @Immutable cannot be " +
@@ -175,7 +175,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_MISSING_IMMUTABLE: Issue = IssueFactory.create(
+        val ISSUE_WHISPER_MISSING_IMMUTABLE: Issue = Issue.create(
             "ImmutableEscape",
             "The reference annotated by @Immutable has escaped.",
             "Can not assign an immutable object to a mutable object.",
@@ -187,7 +187,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_OVERRIDE_IMMUTABLE: Issue = IssueFactory.create(
+        val ISSUE_WHISPER_OVERRIDE_IMMUTABLE: Issue = Issue.create(
             "ImmutableOverride",
             "The method or parameter should annotate with @Immutable.",
             "The method in the super class inherited by this method has " +
@@ -201,7 +201,7 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
                 EnumSet.of(Scope.JAVA_FILE)
             ))
 
-        val ISSUE_WHISPER_IMMUTABLE_TARGET: Issue = IssueFactory.create(
+        val ISSUE_WHISPER_IMMUTABLE_TARGET: Issue = Issue.create(
             "ImmutableTarget",
             "Types that cannot be annotated by @Immutable.",
             "The class or super class of target annotated by @Immutable must " +
