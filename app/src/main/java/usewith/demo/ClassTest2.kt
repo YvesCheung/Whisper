@@ -13,4 +13,8 @@ class ClassTest2 {
 
         instance.addListener { }
     }
+
+    private fun unInit() {
+        instance.deInit()
+    }
 }
