@@ -1,20 +1,33 @@
 package usewith.demo
 
+import com.yy.mobile.whisper.UseWith
+
 /**
  * @author YvesCheung
  * 2019-12-19
  */
 class ClassTest2 {
 
-    private val instance = UseWithCase()
+    private val instance = SDK()
 
     private fun init() {
         instance.init()
-
-        instance.addListener { }
     }
 
     private fun unInit() {
-        instance.deInit()
+        //instance.deInit()
+    }
+
+    class SDK {
+
+        @UseWith("deInit")
+        fun init() {
+            //init sdk
+        }
+
+        fun deInit() {
+            //Don't forget deInit!!
+        }
     }
 }
+
