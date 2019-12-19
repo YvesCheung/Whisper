@@ -7,9 +7,9 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Created by 张宇 on 2018/9/4.
- * E-mail: zhangyu4@yy.com
- * YY: 909017428
+ * @author YvesCheung
+ * 2018/9/4.
+ *
  */
 @Documented
 @Target({ElementType.METHOD, ElementType.CONSTRUCTOR})

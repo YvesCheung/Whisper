@@ -3,9 +3,9 @@ package usewith.demo;
 import com.yy.mobile.whisper.UseWith;
 
 /**
- * Created by 张宇 on 2018/9/19.
- * E-mail: zhangyu4@yy.com
- * YY: 909017428
+ * @author YvesCheung
+ * 2018/9/19.
+ *
  */
 public class UseWithCase {
 

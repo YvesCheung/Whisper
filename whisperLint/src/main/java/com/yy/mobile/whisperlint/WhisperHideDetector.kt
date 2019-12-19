@@ -18,9 +18,9 @@ import org.jetbrains.uast.getContainingUClass
 import java.util.*
 
 /**
- * Created by 张宇 on 2018/9/3.
- * E-mail: zhangyu4@yy.com
- * YY: 909017428
+ * @author YvesCheung
+ * 2018/9/3.
+ *
  */
 class WhisperHideDetector : Detector(), Detector.UastScanner {
 

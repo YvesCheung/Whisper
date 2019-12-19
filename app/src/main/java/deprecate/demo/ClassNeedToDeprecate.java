@@ -6,9 +6,9 @@ import android.support.annotation.Nullable;
 import com.yy.mobile.whisper.DeprecatedBy;
 
 /**
- * Created by 张宇 on 2018/9/18.
- * E-mail: zhangyu4@yy.com
- * YY: 909017428
+ * @author YvesCheung
+ * 2018/9/18.
+ *
  */
 public class ClassNeedToDeprecate {
 
