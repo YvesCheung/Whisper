@@ -215,4 +215,69 @@ class WhisperHintTest {
                 "               ~~~~~\n" +
                 "0 errors, 0 warnings")
     }
+
+    @Test
+    fun `Check Kotlin method`() {
+        lint().files(
+            needInfoAnnotationFile,
+            needWarningAnnotationFile,
+            needErrorAnnotationFile,
+            kotlin("""
+                |package com.yy.mobile
+                |
+                |import com.yy.mobile.whisper.NeedError
+                |import com.yy.mobile.whisper.NeedInfo
+                |import com.yy.mobile.whisper.NeedWarning
+                |
+                |class ClassTest2 {
+                |
+                |   @NeedInfo("This method should show info")
+                |   private fun info() {
+                |       //Do Nothing.
+                |   }
+                |
+                |   @NeedWarning("This method should show warning")
+                |   private fun warning() {
+                |       //Do Nothing.
+                |   }
+                |
+                |   @NeedError("This method should show error")
+                |   private fun error() {
+                |       //Do Nothing.
+                |   }
+                |
+                |   companion object {
+                |
+                |       @JvmStatic
+                |       fun main(args: Array<String>) {
+                |           val instance = ClassTest2()
+                |           instance.info()
+                |           instance.warning()
+                |           instance.error()
+                |       }
+                |   }
+                |}
+            """.trimMargin()))
+            .detector(WhisperHintDetector())
+            .run()
+            .expect("src/com/yy/mobile/ClassTest2.kt:31: Error: This method should show error [WhisperError]\n" +
+                "           instance.error()\n" +
+                "           ~~~~~~~~~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:31: Error: This method should show error [WhisperError]\n" +
+                "           instance.error()\n" +
+                "           ~~~~~~~~~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:29: Information: This method should show info [WhisperInfo]\n" +
+                "           instance.info()\n" +
+                "           ~~~~~~~~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:29: Information: This method should show info [WhisperInfo]\n" +
+                "           instance.info()\n" +
+                "           ~~~~~~~~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:30: Warning: This method should show warning [WhisperWarning]\n" +
+                "           instance.warning()\n" +
+                "           ~~~~~~~~~~~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:30: Warning: This method should show warning [WhisperWarning]\n" +
+                "           instance.warning()\n" +
+                "           ~~~~~~~~~~~~~~~~~~\n" +
+                "2 errors, 2 warnings")
+    }
 }

@@ -1,22 +1,21 @@
 package com.yy.mobile.whisperlint
 
 import com.android.tools.lint.client.api.UElementHandler
-import com.android.tools.lint.detector.api.AnnotationUsageType
 import com.android.tools.lint.detector.api.Category
-import com.android.tools.lint.detector.api.ConstantEvaluator
 import com.android.tools.lint.detector.api.Detector
 import com.android.tools.lint.detector.api.Implementation
 import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
+import com.android.tools.lint.detector.api.UastLintUtils.Companion.getAnnotationStringValue
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiField
-import com.intellij.psi.PsiMethod
 import org.jetbrains.uast.UAnnotation
+import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.USimpleNameReferenceExpression
-import org.jetbrains.uast.evaluateString
+import org.jetbrains.uast.getUastParentOfType
 import java.util.*
 
 /**
@@ -74,42 +73,10 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
             ISSUE_WHISPER_INFO)
     }
 
-    override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-        return type == AnnotationUsageType.METHOD_CALL ||
-            type == AnnotationUsageType.METHOD_CALL_PARAMETER ||
-            type == AnnotationUsageType.ANNOTATION_REFERENCE
-    }
-
-    override fun applicableAnnotations() = listOf(
-        needWarningAnnotation, needErrorAnnotation, needInfoAnnotation)
-
-    override fun visitAnnotationUsage(
-        context: JavaContext,
-        usage: UElement,
-        type: AnnotationUsageType,
-        annotation: UAnnotation,
-        qualifiedName: String,
-        method: PsiMethod?,
-        annotations: List<UAnnotation>,
-        allMemberAnnotations: List<UAnnotation>,
-        allClassAnnotations: List<UAnnotation>,
-        allPackageAnnotations: List<UAnnotation>
-    ) {
-
-        val reportMsg = annotation.attributeValues.firstOrNull()
-            ?.expression?.evaluateString() ?: return
-
-        val issue = when (annotation.qualifiedName) {
-            needWarningAnnotation -> ISSUE_WHISPER_WARNING
-            needErrorAnnotation -> ISSUE_WHISPER_ERROR
-            needInfoAnnotation -> ISSUE_WHISPER_INFO
-            else -> return
-        }
-
-        context.report(issue, usage, context.getLocation(usage), reportMsg)
-    }
-
-    override fun getApplicableUastTypes() = listOf(USimpleNameReferenceExpression::class.java)
+    override fun getApplicableUastTypes() = listOf<Class<out UElement>>(
+        USimpleNameReferenceExpression::class.java,
+        UCallExpression::class.java
+    )
 
     override fun createUastHandler(context: JavaContext): UElementHandler = WhisperHintHandler(context)
 
@@ -124,18 +91,34 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
                 ?: modifierList.findAnnotation(needInfoAnnotation)
                 ?: return
 
-            val psiAnnoValue = anno.parameterList.attributes.firstOrNull()?.value
-            val hint = (ConstantEvaluator().evaluate(psiAnnoValue) as? String)
+            reportAnnotation(anno, node)
+        }
+
+        override fun visitCallExpression(node: UCallExpression) {
+            val method = node.resolve() ?: return
+            val annotation = method.getAnnotation(needErrorAnnotation)
+                ?: method.getAnnotation(needWarningAnnotation)
+                ?: method.getAnnotation(needInfoAnnotation)
                 ?: return
 
-            val issue = when (anno.qualifiedName) {
-                needWarningAnnotation -> ISSUE_WHISPER_WARNING
-                needErrorAnnotation -> ISSUE_WHISPER_ERROR
-                needInfoAnnotation -> ISSUE_WHISPER_INFO
-                else -> return
-            }
+            reportAnnotation(annotation, node)
+        }
 
-            context.report(issue, node, context.getLocation(node), hint)
+        private fun reportAnnotation(anno: PsiAnnotation, node: UElement) {
+            val uast = anno.getUastParentOfType(UAnnotation::class.java)
+                ?: return
+            if (uast.qualifiedName == anno.qualifiedName) {
+                val hint = getAnnotationStringValue(uast, "value") ?: return
+
+                val issue = when (anno.qualifiedName) {
+                    needWarningAnnotation -> ISSUE_WHISPER_WARNING
+                    needErrorAnnotation -> ISSUE_WHISPER_ERROR
+                    needInfoAnnotation -> ISSUE_WHISPER_INFO
+                    else -> return
+                }
+
+                context.report(issue, node, context.getLocation(node), hint)
+            }
         }
     }
 }
