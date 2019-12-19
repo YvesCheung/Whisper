@@ -4,6 +4,7 @@ import com.android.tools.lint.checks.infrastructure.TestFile
 import com.android.tools.lint.checks.infrastructure.TestFiles.java
 import com.android.tools.lint.checks.infrastructure.TestFiles.kotlin
 import com.android.tools.lint.checks.infrastructure.TestLintTask
+import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
 import org.junit.Test
 
 /**
@@ -1439,5 +1440,42 @@ class WhisperUseWithTest {
             .detector(WhisperUseWithDetector())
             .run()
             .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check simple init test`() {
+        lint().files(
+            useWithAnnotation,
+            kotlin("""
+                |package usewith.demo
+                |import com.yy.mobile.whisper.UseWith
+                |
+                |class ClassTest2 {
+                |   private val instance = SDK()
+                |   private fun init() {
+                |       instance.init()
+                |   }
+                |   
+                |   private fun unInit() {
+                |       //instance.deInit()
+                |   }
+                |   
+                |   class SDK {
+                |       @UseWith("deInit")
+                |       fun init() {
+                |           //init sdk
+                |       }
+                |       
+                |       fun deInit() {
+                |           //Don't forget deInit!!
+                |       }
+                |   }
+                |}""".trimMargin()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("src/usewith/demo/ClassTest2.kt:7: Warning: init() should be used with deInit [MissingUsage]\n" +
+                "       instance.init()\n" +
+                "       ~~~~~~~~~~~~~~~\n" +
+                "0 errors, 1 warnings")
     }
 }

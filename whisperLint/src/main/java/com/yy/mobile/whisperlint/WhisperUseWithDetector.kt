@@ -10,6 +10,7 @@ import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.LintUtils.getMethodName
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
+import com.android.tools.lint.detector.api.UastLintUtils
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiPrimitiveType
@@ -164,13 +165,11 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         method ?: return
         val evaluator = context.evaluator
 
-        val useWithStr = annotation.attributeValues.firstOrNull()
-            ?.expression?.evaluateString()
+        val useWithStr = UastLintUtils.getAnnotationStringValue(annotation, "value")
             ?: return
 
         val methodItSelfClass = method.containingClass?.qualifiedName
         val methodReturnClass = method.returnType?.canonicalText
-
 
         val call = usage as? UCallExpression ?: return
 
