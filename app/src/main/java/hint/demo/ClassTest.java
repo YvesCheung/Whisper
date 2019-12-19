@@ -12,23 +12,26 @@ public class ClassTest {
 
     public static void main(String[] args) {
         ClassTest instance = new ClassTest();
-        instance.info();
-        instance.warning();
-        instance.error();
+
+        instance.method1();
+
+        instance.method2();
+
+        instance.method3();
     }
 
-    @NeedInfo("This method should show info")
-    private void info() {
+    @NeedInfo("Info: This is method1")
+    private void method1() {
         //Do Nothing.
     }
 
-    @NeedWarning("This method should show warning")
-    private void warning() {
+    @NeedWarning("Warning: This is method2!")
+    private void method2() {
         //Do Nothing.
     }
 
-    @NeedError("This method should show error")
-    private void error() {
+    @NeedError("Error: This is method3!")
+    private void method3() {
         //Do Nothing.
     }
 }
