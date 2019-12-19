@@ -280,4 +280,88 @@ class WhisperHintTest {
                 "           ~~~~~~~~~~~~~~~~~~\n" +
                 "2 errors, 2 warnings")
     }
+
+    @Test
+    fun `Check method with annotation parameter`() {
+        lint().files(
+            needInfoAnnotationFile,
+            needWarningAnnotationFile,
+            needErrorAnnotationFile,
+            java("""
+                |package com.yy.mobile;
+                |
+                |import com.yy.mobile.whisper.NeedError;
+                |import com.yy.mobile.whisper.NeedInfo;
+                |import com.yy.mobile.whisper.NeedWarning;
+                |
+                |public class ClassTest1 {
+                |   
+                |   public static void main(String[] args) {
+                |       ClassTest1 instance = new ClassTest1();
+                |       instance.method1("a");
+                |       instance.method2(2);
+                |       instance.method3(instance);
+                |   }
+                |   
+                |   public void method1(@NeedInfo("this is method1") String info){}
+                |   public void method2(@NeedWarning("this is method2") int info){}
+                |   public void method3(@NeedError("this is method3") ClassTest1 info){}
+                |}
+                |""".trimMargin()),
+            kotlin("""
+                |package com.yy.mobile
+                |
+                |import com.yy.mobile.whisper.NeedError
+                |import com.yy.mobile.whisper.NeedInfo
+                |import com.yy.mobile.whisper.NeedWarning
+                |
+                |class ClassTest2 {
+                |
+                |   fun method1(@NeedInfo("this is method1") info: String){}
+                |   fun method2(@NeedWarning("this is method2") info: Int){}
+                |   fun method3(@NeedError("this is method3") info: ClassTest2){}
+                |
+                |   companion object {
+                |
+                |       @JvmStatic
+                |       fun main(args: Array<String>) {
+                |           val instance = ClassTest2()
+                |           instance.method1("a");
+                |           instance.method2(2);
+                |           instance.method3(instance);
+                |       }
+                |   }
+                |}
+            """.trimMargin()))
+            .detector(WhisperHintDetector())
+            .run()
+            .expect("src/com/yy/mobile/ClassTest1.java:13: Error: this is method3 [WhisperError]\n" +
+                "       instance.method3(instance);\n" +
+                "                        ~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:20: Error: this is method3 [WhisperError]\n" +
+                "           instance.method3(instance);\n" +
+                "                            ~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:20: Error: this is method3 [WhisperError]\n" +
+                "           instance.method3(instance);\n" +
+                "                            ~~~~~~~~\n" +
+                "src/com/yy/mobile/ClassTest1.java:11: Information: this is method1 [WhisperInfo]\n" +
+                "       instance.method1(\"a\");\n" +
+                "                        ~~~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:18: Information: this is method1 [WhisperInfo]\n" +
+                "           instance.method1(\"a\");\n" +
+                "                             ~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:18: Information: this is method1 [WhisperInfo]\n" +
+                "           instance.method1(\"a\");\n" +
+                "                             ~\n" +
+                "src/com/yy/mobile/ClassTest1.java:12: Warning: this is method2 [WhisperWarning]\n" +
+                "       instance.method2(2);\n" +
+                "                        ~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:19: Warning: this is method2 [WhisperWarning]\n" +
+                "           instance.method2(2);\n" +
+                "                            ~\n" +
+                "src/com/yy/mobile/ClassTest2.kt:19: Warning: this is method2 [WhisperWarning]\n" +
+                "           instance.method2(2);\n" +
+                "                            ~\n" +
+                "3 errors, 3 warnings")
+    }
 }
