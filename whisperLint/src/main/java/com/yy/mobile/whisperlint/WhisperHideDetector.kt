@@ -9,11 +9,10 @@ import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiMethod
+import com.yy.mobile.whisperlint.support.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
-import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
-import org.jetbrains.uast.evaluateString
 import org.jetbrains.uast.getContainingUClass
 import java.util.*
 
@@ -64,17 +63,14 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
     ) {
         val methodInClass = method?.containingClass ?: return
 
-        val friendClsStr = annotation.attributeValues.firstOrNull()?.expression
-            as? UCallExpression ?: return
+        val friendClsSet =
+            AnnotationCompat.getAnnotationStringValues(annotation, "friend")?.toMutableSet()
+                ?: return
 
-        val friendClsSet = friendClsStr.valueArguments
-            .map {
-                it.evaluateString()
-            }
-            .toMutableSet()
-            .apply {
-                add(methodInClass.qualifiedName)
-            }
+        val selfClassName = methodInClass.qualifiedName
+        if (selfClassName != null) {
+            friendClsSet.add(selfClassName)
+        }
 
         var shouldReport = true
 
