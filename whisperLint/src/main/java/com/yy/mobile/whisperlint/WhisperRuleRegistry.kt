@@ -15,4 +15,6 @@ class WhisperRuleRegistry : IssueRegistry() {
             *WhisperImmutableDetector.getIssue())
 
     override val api: Int = CURRENT_API
+
+    override val minApi: Int = 5
 }

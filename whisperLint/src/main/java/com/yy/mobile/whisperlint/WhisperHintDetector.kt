@@ -9,10 +9,10 @@ import com.android.tools.lint.detector.api.Issue
 import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
-import com.android.tools.lint.detector.api.UastLintUtils.Companion.getAnnotationStringValue
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
+import com.yy.mobile.whisperlint.support.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.USimpleNameReferenceExpression
@@ -132,7 +132,8 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
     }
 
     private fun reportAnnotation(context: JavaContext, anno: UAnnotation, node: UElement) {
-        val hint = getAnnotationStringValue(anno, "value") ?: return
+
+        val hint = AnnotationCompat.getAnnotationStringValue(anno, "value") ?: return
 
         val issue = when (anno.qualifiedName) {
             needWarningAnnotation -> ISSUE_WHISPER_WARNING

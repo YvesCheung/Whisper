@@ -10,10 +10,10 @@ import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.LintUtils.getMethodName
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
-import com.android.tools.lint.detector.api.UastLintUtils
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiPrimitiveType
+import com.yy.mobile.whisperlint.support.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
@@ -165,7 +165,7 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
         method ?: return
         val evaluator = context.evaluator
 
-        val useWithStr = UastLintUtils.getAnnotationStringValue(annotation, "value")
+        val useWithStr = AnnotationCompat.getAnnotationStringValue(annotation, "value")
             ?: return
 
         val methodItSelfClass = method.containingClass?.qualifiedName
