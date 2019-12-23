@@ -90,9 +90,6 @@ abstract class DataFlowVisitor(
     protected fun includeNode(node: UExpression?): Boolean {
         node ?: return false
 
-        if (node.psi?.text == "System.out") return false
-        //if (node.javaPsi?.text == "System.out") return false
-
         fun isLightMethodButNotConstructor(psi: PsiElement): Boolean {
             if (psi is KtLightMethod) {
                 if (node is UCallExpression) {
@@ -112,7 +109,11 @@ abstract class DataFlowVisitor(
                     return true
                 } else if (isLightMethodButNotConstructor(resolved) ||
                     resolved is PsiVariable) {
-                    return properties.contains(resolved.text)
+                    try {
+                        return properties.contains(resolved.text)
+                    } catch (e: AssertionError) {
+                        //resolved.getMirror() fail!
+                    }
                 }
             }
         }
@@ -120,18 +121,29 @@ abstract class DataFlowVisitor(
     }
 
     override fun visitCallExpression(node: UCallExpression): Boolean {
-        val receiver = node.receiver
         var matched = false
+
+        val receiver = node.receiver
         if (receiver != null) {
             if (includeNode(receiver)) {
                 matched = true
             } else if (receiver is UQualifiedReferenceExpression) {
                 val rec = receiver.receiver
                 val sel = receiver.selector as? UCallExpression
-                if (sel != null) {
+                if (sel != null) { //check kotlin DSL
                     if (returnsSelf(sel) && includeNode(rec)) {
                         matched = true
                     } else if (sel.isKotlinScopingFunction() && includeNode(sel)) {
+                        matched = true
+                    }
+                }
+
+                if (!matched) { //check a.b.c.func() && includeNode(c)
+                    var reference = receiver
+                    while (reference is UQualifiedReferenceExpression) {
+                        reference = receiver.selector
+                    }
+                    if (includeNode(reference)) {
                         matched = true
                     }
                 }

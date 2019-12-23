@@ -1502,4 +1502,44 @@ class WhisperUseWithTest {
                 "       ~~~~~~~~~~~~~~~\n" +
                 "0 errors, 1 warnings")
     }
+
+    @Test
+    fun `Check deInit in inner class`(){
+        lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package a
+                
+                import com.yy.mobile.whisper.UseWith
+                
+                class A {
+
+                    private fun init() {
+                        SDK.init()
+                    }
+                
+                    object SDK {
+                
+                        @UseWith("deInit")
+                        fun init() {
+                            //init sdk
+                        }
+                
+                        fun deInit() {
+                            //Don't forget deInit!!
+                        }
+                    }
+                
+                    private class B {
+                
+                        init {
+                            A.SDK.deInit()
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("No warnings.")
+    }
 }
