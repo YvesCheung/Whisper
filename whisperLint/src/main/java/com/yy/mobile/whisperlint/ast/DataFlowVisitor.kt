@@ -221,7 +221,12 @@ abstract class DataFlowVisitor(
                 if (includeNode(body)) {
                     addVariableReference(node)
                 } else if (body is UBlockExpression) {
-                    if (body.expressions.any { includeNode(it) }) {
+                    val returnExp =
+                        body.expressions.findLast { it is UReturnExpression } as? UReturnExpression
+                    if (returnExp != null &&
+                        includeNode(returnExp.returnExpression)) {
+                        addVariableReference(node)
+                    } else if (body.expressions.any { includeNode(it) }) {
                         addVariableReference(node)
                     }
                 }

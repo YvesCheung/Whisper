@@ -622,23 +622,6 @@ class WhisperUseWithTest {
                 package dd
                 import cc.A
 
-                class C {
-
-                    val a: A by lazy {
-                        A().also { it.init() }
-                    }
-
-                    fun haha() {
-                        val b = a
-                        val c = b
-                        c.apply { deInit() }
-                    }
-                }
-            """.trimIndent()),
-            kotlin("""
-                package dd
-                import cc.A
-
                 class D {
 
                     val a = A().apply { init() }
@@ -680,6 +663,47 @@ class WhisperUseWithTest {
                         a = b
 
                         a?.let { it.deInit() }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperUseWithDetector())
+            .run()
+            .expect("No warnings.")
+    }
+
+    @Test
+    fun `Check Kotlin init and unInit in Kotlin by lazy lambda`() {
+        TestLintTask.lint().files(
+            useWithAnnotation,
+            kotlin("""
+                package cc
+
+                import com.yy.mobile.whisper.UseWith
+
+                public class A {
+
+                    @UseWith("deInit")
+                    fun init() {
+                    }
+
+                    fun deInit() {
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package dd
+                import cc.A
+
+                class C {
+
+                    val a: A by lazy {
+                        A().also { it.init() }
+                    }
+
+                    fun haha() {
+                        val b = a
+                        val c = b
+                        c.apply { deInit() }
                     }
                 }
             """.trimIndent()))
