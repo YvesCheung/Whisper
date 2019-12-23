@@ -528,4 +528,152 @@ class WhisperHideTest {
                 "                         ~~~~~~~~~~~~~~~~~~~~\n" +
                 "2 errors, 0 warnings")
     }
+
+    @Test
+    fun `Check @Hide Kotlin setter`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            kotlin("""
+                package aa.bb
+                
+                import com.yy.mobile.whisper.Hide
+                
+                class TheClassShouldBeHide {
+                    var a: Int = 3
+                        @Hide(friend = ["Friend"])
+                        set(value) {
+                            field = value
+                        }
+                }
+            """.trimIndent()),
+            java("""
+                package aa.bb;
+
+                public class NotFriend {
+
+                    NotFriend() {
+                        TheClassShouldBeHide instance = new TheClassShouldBeHide();
+                        instance.setA(3);
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa.bb;
+
+                public class Friend {
+
+                    Friend() {
+                        TheClassShouldBeHide instance = new TheClassShouldBeHide();
+                        instance.setA(3);
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa.cc
+                import aa.bb.TheClassShouldBeHide
+                
+                public class Friend {
+
+                    init {
+                        val instance = TheClassShouldBeHide()
+                        instance.a = 3;
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa.cc
+                import aa.bb.TheClassShouldBeHide
+                
+                public class NotFriend {
+
+                    init {
+                        val instance = TheClassShouldBeHide()
+                        instance.a = 3;
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("" +
+                "src/aa/bb/NotFriend.java:7: Error: Methods that can only be accessed in [Friend, aa.bb.TheClassShouldBeHide] [HideMember]\n" +
+                "        instance.setA(3);\n" +
+                "                 ~~~~\n" +
+                "1 errors, 0 warnings\n" +
+                "src/aa/cc/NotFriend.kt:8: Error: Methods that can only be accessed in [Friend, aa.bb.TheClassShouldBeHide] [HideMember]\n" +
+                "        instance.a;\n" +
+                "        ~~~~~~~~~~\n" +
+                "2 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check @Hide Kotlin getter`() {
+        TestLintTask.lint().files(
+            hideAnnotation,
+            kotlin("""
+                package aa.bb
+                
+                import com.yy.mobile.whisper.Hide
+                
+                class TheClassShouldBeHide {
+                    var a: Int = 3
+                        @Hide(friend = ["Friend"])
+                        get() = field
+                }
+            """.trimIndent()),
+            java("""
+                package aa.bb;
+
+                public class NotFriend {
+
+                    NotFriend() {
+                        TheClassShouldBeHide instance = new TheClassShouldBeHide();
+                        instance.getA();
+                    }
+                }
+            """.trimIndent()),
+            java("""
+                package aa.bb;
+
+                public class Friend {
+
+                    Friend() {
+                        TheClassShouldBeHide instance = new TheClassShouldBeHide();
+                        instance.getA();
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa.cc
+                import aa.bb.TheClassShouldBeHide
+                
+                public class Friend {
+
+                    init {
+                        val instance = TheClassShouldBeHide()
+                        instance.a;
+                    }
+                }
+            """.trimIndent()),
+            kotlin("""
+                package aa.cc
+                import aa.bb.TheClassShouldBeHide
+                
+                public class NotFriend {
+
+                    init {
+                        val instance = TheClassShouldBeHide()
+                        instance.a;
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperHideDetector())
+            .run()
+            .expect("src/aa/bb/NotFriend.java:7: Error: Methods that can only be accessed in [Friend, aa.bb.TheClassShouldBeHide] [HideMember]\n" +
+                "        instance.getA();\n" +
+                "                 ~~~~\n" +
+                "src/aa/cc/NotFriend.kt:8: Error: Methods that can only be accessed in [Friend, aa.bb.TheClassShouldBeHide] [HideMember]\n" +
+                "        instance.a;\n" +
+                "        ~~~~~~~~~~\n" +
+                "2 errors, 0 warnings")
+    }
 }

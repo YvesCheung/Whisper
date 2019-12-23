@@ -16,6 +16,7 @@ object ClassNeedToHide {
             field = value
         }
 
+    @Hide(friend = ["ClassTest"])
     fun notifyError(str: String) {
         if (debuggable) {
             throw RuntimeException(str)

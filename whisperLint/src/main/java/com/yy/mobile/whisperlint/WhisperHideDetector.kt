@@ -1,5 +1,6 @@
 package com.yy.mobile.whisperlint
 
+import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.AnnotationUsageType
 import com.android.tools.lint.detector.api.Category
 import com.android.tools.lint.detector.api.Detector
@@ -13,7 +14,10 @@ import com.yy.mobile.whisperlint.support.api6.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement
+import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.getContainingUClass
+import org.jetbrains.uast.getUastParentOfType
+import org.jetbrains.uast.kotlin.KotlinUSimpleReferenceExpression
 import java.util.*
 
 /**
@@ -44,7 +48,13 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
     }
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-        return type == AnnotationUsageType.METHOD_CALL
+        return type in setOf(
+            AnnotationUsageType.METHOD_CALL,
+            AnnotationUsageType.ASSIGNMENT,
+            AnnotationUsageType.BINARY,
+            AnnotationUsageType.EQUALITY,
+            AnnotationUsageType.FIELD_REFERENCE,
+            AnnotationUsageType.VARIABLE_REFERENCE)
     }
 
     override fun applicableAnnotations() = listOf(hideAnnotation)
@@ -61,13 +71,41 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
         allClassAnnotations: List<UAnnotation>,
         allPackageAnnotations: List<UAnnotation>
     ) {
-        val methodInClass = method?.containingClass ?: return
+        reportAnnotationCall(context, usage, method, annotation)
+    }
 
+    override fun getApplicableUastTypes() = listOf<Class<out UElement>>(
+        UQualifiedReferenceExpression::class.java
+    )
+
+    override fun createUastHandler(context: JavaContext): UElementHandler {
+        return object : UElementHandler() {
+
+            override fun visitQualifiedReferenceExpression(node: UQualifiedReferenceExpression) {
+                val kotlinGetterOrSetter =
+                    node.selector as? KotlinUSimpleReferenceExpression ?: return
+
+                val psiMethod = kotlinGetterOrSetter.resolve() as? PsiMethod ?: return
+                val annotation =
+                    psiMethod.getAnnotation(hideAnnotation)
+                        ?.getUastParentOfType(UAnnotation::class.java) ?: return
+
+                reportAnnotationCall(context, node, psiMethod, annotation)
+            }
+        }
+    }
+
+    private fun reportAnnotationCall(
+        context: JavaContext,
+        usage: UElement,
+        method: PsiMethod?,
+        annotation: UAnnotation
+    ) {
         val friendClsSet =
             AnnotationCompat.getAnnotationStringValues(annotation, "friend")?.toMutableSet()
                 ?: return
 
-        val selfClassName = methodInClass.qualifiedName
+        val selfClassName = method?.containingClass?.qualifiedName
         if (selfClassName != null) {
             friendClsSet.add(selfClassName)
         }
