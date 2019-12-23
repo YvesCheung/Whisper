@@ -1,12 +1,13 @@
 package com.yy.mobile.whisperlint.support.api6
 
+import com.android.tools.lint.detector.api.CURRENT_API
 import com.android.tools.lint.detector.api.ConstantEvaluator
 import com.intellij.psi.PsiArrayInitializerMemberValue
 import com.intellij.psi.impl.compiled.ClsAnnotationImpl
+import com.yy.mobile.whisperlint.support.VersionChecker
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.util.isArrayInitializer
-import com.android.tools.lint.detector.api.CURRENT_API
 import java.util.*
 
 /**
@@ -17,8 +18,12 @@ internal sealed class AnnotationValuesExtractor {
 
     companion object {
         @JvmStatic
-        internal fun getAnnotationValuesExtractor(annotation: UAnnotation?): AnnotationValuesExtractor =
-            if (annotation?.javaPsi is ClsAnnotationImpl) Compiled else Source
+        internal fun getAnnotationValuesExtractor(annotation: UAnnotation?): AnnotationValuesExtractor {
+            if (VersionChecker.envVersion() <= 1) {
+                return Source
+            }
+            return if (annotation?.javaPsi is ClsAnnotationImpl) Compiled else Source
+        }
     }
 
     internal abstract fun getAnnotationConstantObject(annotation: UAnnotation?, name: String): Any?
