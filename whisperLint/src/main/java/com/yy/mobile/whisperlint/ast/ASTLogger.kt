@@ -1,4 +1,4 @@
-package com.yy.mobile.whisperlint
+package com.yy.mobile.whisperlint.ast
 
 import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.Category

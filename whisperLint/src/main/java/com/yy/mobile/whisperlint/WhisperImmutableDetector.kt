@@ -22,7 +22,9 @@ import com.intellij.psi.PsiModifierListOwner
 import com.intellij.psi.PsiParameter
 import com.intellij.psi.PsiVariable
 import com.intellij.psi.impl.source.PsiClassReferenceType
-import org.jetbrains.kotlin.psi.psiUtil.parameterIndex
+import com.yy.mobile.whisperlint.ast.DataFlowVisitor
+import com.yy.mobile.whisperlint.ast.getAvailableCaller
+import com.yy.mobile.whisperlint.ast.getAvailableReturnValue
 import org.jetbrains.uast.UAnnotated
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression

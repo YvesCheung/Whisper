@@ -13,6 +13,9 @@ import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiPrimitiveType
+import com.yy.mobile.whisperlint.ast.DataFlowVisitor
+import com.yy.mobile.whisperlint.ast.getAvailableCaller
+import com.yy.mobile.whisperlint.ast.getAvailableReturnValue
 import com.yy.mobile.whisperlint.support.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
