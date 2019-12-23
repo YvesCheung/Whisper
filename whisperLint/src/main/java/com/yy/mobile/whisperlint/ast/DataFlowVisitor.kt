@@ -111,7 +111,7 @@ abstract class DataFlowVisitor(
                     resolved is PsiVariable) {
                     try {
                         return properties.contains(resolved.text)
-                    } catch (e: AssertionError) {
+                    } catch (e: Throwable) {
                         //resolved.getMirror() fail!
                     }
                 }
