@@ -5,7 +5,8 @@ buildscript {
     //test gradle version compat
     //ext.gradle_version = '3.5.0'
     //ext.gradle_version = '3.4.0'
-    ext.gradle_version = '3.3.0'
+    //ext.gradle_version = '3.3.0'
+    ext.gradle_version = '3.2.0'
     repositories {
         google()
         jcenter()

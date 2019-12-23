@@ -12,6 +12,7 @@ import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
+import com.yy.mobile.whisperlint.support.api2.AnnotationUsageTypeCompat
 import com.yy.mobile.whisperlint.support.api6.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UElement
@@ -75,10 +76,10 @@ class WhisperHintDetector : Detector(), Detector.UastScanner {
     }
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-        return type in listOf(
-            AnnotationUsageType.METHOD_CALL,
-            AnnotationUsageType.METHOD_CALL_PARAMETER,
-            AnnotationUsageType.ANNOTATION_REFERENCE
+        return type in AnnotationUsageTypeCompat.setOf(
+            AnnotationUsageTypeCompat.METHOD_CALL,
+            AnnotationUsageTypeCompat.METHOD_CALL_PARAMETER,
+            AnnotationUsageTypeCompat.ANNOTATION_REFERENCE
         )
     }
 

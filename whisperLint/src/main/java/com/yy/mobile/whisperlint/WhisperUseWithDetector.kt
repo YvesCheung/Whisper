@@ -16,6 +16,7 @@ import com.intellij.psi.PsiPrimitiveType
 import com.yy.mobile.whisperlint.ast.DataFlowVisitor
 import com.yy.mobile.whisperlint.ast.getAvailableCaller
 import com.yy.mobile.whisperlint.ast.getAvailableReturnValue
+import com.yy.mobile.whisperlint.support.api2.AnnotationUsageTypeCompat
 import com.yy.mobile.whisperlint.support.api6.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
@@ -149,7 +150,7 @@ class WhisperUseWithDetector : Detector(), Detector.UastScanner {
     }
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType) =
-        type == AnnotationUsageType.METHOD_CALL
+        type in AnnotationUsageTypeCompat.setOf(AnnotationUsageTypeCompat.METHOD_CALL)
 
     override fun applicableAnnotations() = listOf(useWithAnnotation)
 

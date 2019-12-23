@@ -10,6 +10,7 @@ import com.android.tools.lint.detector.api.LintFix
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiMethod
+import com.yy.mobile.whisperlint.support.api2.AnnotationUsageTypeCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
@@ -59,7 +60,7 @@ class WhisperDeprecatedDetector : Detector(), Detector.UastScanner {
     }
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-        return type == AnnotationUsageType.METHOD_CALL
+        return type in AnnotationUsageTypeCompat.setOf(AnnotationUsageTypeCompat.METHOD_CALL)
     }
 
     override fun applicableAnnotations() = listOf(deprecatedAnnotation)

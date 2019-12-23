@@ -25,6 +25,7 @@ import com.intellij.psi.impl.source.PsiClassReferenceType
 import com.yy.mobile.whisperlint.ast.DataFlowVisitor
 import com.yy.mobile.whisperlint.ast.getAvailableCaller
 import com.yy.mobile.whisperlint.ast.getAvailableReturnValue
+import com.yy.mobile.whisperlint.support.api2.AnnotationUsageTypeCompat
 import org.jetbrains.uast.UAnnotated
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
@@ -432,8 +433,9 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
     override fun applicableAnnotations() = listOf(immutableAnnotation)
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-        return type == AnnotationUsageType.ASSIGNMENT ||
-            type == AnnotationUsageType.METHOD_CALL
+        return type in AnnotationUsageTypeCompat.setOf(
+            AnnotationUsageTypeCompat.ASSIGNMENT,
+            AnnotationUsageTypeCompat.METHOD_CALL)
     }
 
     override fun visitAnnotationUsage(
@@ -448,14 +450,15 @@ class WhisperImmutableDetector : Detector(), Detector.UastScanner {
         allClassAnnotations: List<UAnnotation>,
         allPackageAnnotations: List<UAnnotation>
     ) {
-        usage as? UExpression ?: return
+        if (usage !is UExpression) return
 
         val scope: UElement = usage.getContainingUMethod() as? UElement
             ?: usage.getContainingUClass()
             ?: usage.getContainingUFile()
             ?: return
 
-        val (instances, references, properties) = usage.getAvailableReturnValue()
+        val (instances, references, properties) =
+            usage.getAvailableReturnValue()
 
         deepSearchUsage(context, context.getLocation(usage), scope, instances, references, properties)
     }

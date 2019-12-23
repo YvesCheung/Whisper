@@ -10,6 +10,8 @@ import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiMethod
+import com.yy.mobile.whisperlint.support.api2.AnnotationUsageTypeCompat
+import com.yy.mobile.whisperlint.support.api2.getAnnotationCompat
 import com.yy.mobile.whisperlint.support.api6.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UClass
@@ -48,13 +50,13 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
     }
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean {
-        return type in setOf(
-            AnnotationUsageType.METHOD_CALL,
-            AnnotationUsageType.ASSIGNMENT,
-            AnnotationUsageType.BINARY,
-            AnnotationUsageType.EQUALITY,
-            AnnotationUsageType.FIELD_REFERENCE,
-            AnnotationUsageType.VARIABLE_REFERENCE)
+        return type in AnnotationUsageTypeCompat.setOf(
+            AnnotationUsageTypeCompat.METHOD_CALL,
+            AnnotationUsageTypeCompat.ASSIGNMENT,
+            AnnotationUsageTypeCompat.BINARY,
+            AnnotationUsageTypeCompat.EQUALITY,
+            AnnotationUsageTypeCompat.FIELD_REFERENCE,
+            AnnotationUsageTypeCompat.VARIABLE_REFERENCE)
     }
 
     override fun applicableAnnotations() = listOf(hideAnnotation)
@@ -87,7 +89,7 @@ class WhisperHideDetector : Detector(), Detector.UastScanner {
 
                 val psiMethod = kotlinGetterOrSetter.resolve() as? PsiMethod ?: return
                 val annotation =
-                    psiMethod.getAnnotation(hideAnnotation)
+                    psiMethod.getAnnotationCompat(hideAnnotation)
                         ?.getUastParentOfType(UAnnotation::class.java) ?: return
 
                 reportAnnotationCall(context, node, psiMethod, annotation)

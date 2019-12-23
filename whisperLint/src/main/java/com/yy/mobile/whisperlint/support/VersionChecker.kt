@@ -6,7 +6,7 @@ import com.android.tools.lint.detector.api.CURRENT_API
  * @author YvesCheung
  * 2019-12-20
  */
-object VersionChecker {
+internal object VersionChecker {
 
     private const val UNDEFINED = -1
 
