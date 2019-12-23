@@ -1,4 +1,4 @@
-package com.yy.mobile.whisperlint.support
+package com.yy.mobile.whisperlint.support.api6
 
 import com.android.tools.lint.detector.api.ConstantEvaluator
 import com.intellij.psi.PsiArrayInitializerMemberValue
@@ -83,7 +83,8 @@ internal sealed class AnnotationValuesExtractor {
             getClsAnnotation(annotation)?.findDeclaredAttributeValue(name)?.let { ConstantEvaluator.evaluate(null, it) }
 
         override fun getAnnotationStringValues(annotation: UAnnotation?, name: String): Array<String>? {
-            val clsAnnotation = getClsAnnotation(annotation) ?: return null
+            val clsAnnotation = getClsAnnotation(annotation)
+                ?: return null
             val attribute = clsAnnotation.findDeclaredAttributeValue(name) ?: return null
 
             if (attribute is PsiArrayInitializerMemberValue) {

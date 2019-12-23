@@ -9,7 +9,7 @@ import com.android.tools.lint.detector.api.JavaContext
 import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiMethod
-import com.yy.mobile.whisperlint.support.AnnotationCompat
+import com.yy.mobile.whisperlint.support.api6.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UElement

@@ -1,4 +1,4 @@
-package com.yy.mobile.whisperlint.support
+package com.yy.mobile.whisperlint.support.api6
 
 import com.android.SdkConstants
 import com.android.tools.lint.detector.api.CURRENT_API
@@ -7,11 +7,13 @@ import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UExpression
 
 /**
- * @author YvesCheung
- * 2019-12-20
+ * compat android gradle plugin < 3.6+
  *
  * copy from [com.android.tools.lint.detector.api.UastLintUtils]
  * Adapt to a version lower than [CURRENT_API]
+ *
+ * @author YvesCheung
+ * 2019-12-20
  */
 object AnnotationCompat {
 
@@ -55,8 +57,7 @@ object AnnotationCompat {
         annotation: UAnnotation?,
         name: String
     ): Boolean? {
-        return AnnotationValuesExtractor
-            .getAnnotationValuesExtractor(annotation)
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
             .getAnnotationBooleanValue(annotation, name)
     }
 
@@ -75,8 +76,7 @@ object AnnotationCompat {
         annotation: UAnnotation?,
         name: String
     ): Long? {
-        return AnnotationValuesExtractor
-            .getAnnotationValuesExtractor(annotation)
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
             .getAnnotationLongValue(annotation, name)
     }
 
@@ -95,8 +95,7 @@ object AnnotationCompat {
         annotation: UAnnotation?,
         name: String
     ): Double? {
-        return AnnotationValuesExtractor
-            .getAnnotationValuesExtractor(annotation)
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
             .getAnnotationDoubleValue(annotation, name)
     }
 
@@ -115,8 +114,7 @@ object AnnotationCompat {
         annotation: UAnnotation?,
         name: String
     ): String? {
-        return AnnotationValuesExtractor
-            .getAnnotationValuesExtractor(annotation)
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
             .getAnnotationStringValue(annotation, name)
     }
 
@@ -125,8 +123,7 @@ object AnnotationCompat {
         annotation: UAnnotation?,
         name: String
     ): Array<String>? {
-        return AnnotationValuesExtractor
-            .getAnnotationValuesExtractor(annotation)
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
             .getAnnotationStringValues(annotation, name)
     }
 }

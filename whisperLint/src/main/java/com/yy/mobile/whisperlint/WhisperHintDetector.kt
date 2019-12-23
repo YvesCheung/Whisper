@@ -12,7 +12,7 @@ import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
-import com.yy.mobile.whisperlint.support.AnnotationCompat
+import com.yy.mobile.whisperlint.support.api6.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.USimpleNameReferenceExpression

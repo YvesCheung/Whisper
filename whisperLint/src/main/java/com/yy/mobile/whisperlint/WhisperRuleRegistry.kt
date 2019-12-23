@@ -16,5 +16,5 @@ class WhisperRuleRegistry : IssueRegistry() {
 
     override val api: Int = CURRENT_API
 
-    override val minApi: Int = 5
+    override val minApi: Int = 1
 }

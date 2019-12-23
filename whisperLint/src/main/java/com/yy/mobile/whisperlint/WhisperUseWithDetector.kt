@@ -16,7 +16,7 @@ import com.intellij.psi.PsiPrimitiveType
 import com.yy.mobile.whisperlint.ast.DataFlowVisitor
 import com.yy.mobile.whisperlint.ast.getAvailableCaller
 import com.yy.mobile.whisperlint.ast.getAvailableReturnValue
-import com.yy.mobile.whisperlint.support.AnnotationCompat
+import com.yy.mobile.whisperlint.support.api6.AnnotationCompat
 import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UElement
