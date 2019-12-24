@@ -9,20 +9,29 @@ import java.util.List;
  * @author YvesCheung
  * 2019-12-23
  */
+@SuppressWarnings("unused")
 public class ClassTest {
 
     @Immutable
-    private final List<String> list = new ArrayList<>();
+    private final List<String> immutableList = new ArrayList<>();
+
+    private final List<String> mutableList = new ArrayList<>();
 
     void test() {
-        list.add("Can't add element to immutable collection");
+        immutableList.add("Can't add element to immutable collection");
 
-        for (String element : list) {
+        mutableList.add("Can add element to mutable collection");
+
+        for (String element : immutableList) {
             System.out.println("read immutable collection is ok");
+        }
+        for (String element : mutableList) {
+            System.out.println("read mutable collection is ok");
         }
     }
 
+    @Immutable
     public List<String> escape() {
-        return list;
+        return immutableList;
     }
 }
