@@ -4,7 +4,7 @@
 
 ![hello whisper][1]
 
-**Whisper** 是一套针对注解的代码检阅规则，作用于Android静态代码扫描，可以给开发人员在编写代码时提供代码提示和修改建议。**Whisper** 基于 [**Android Lint**][2] 开发，**Lint** 天然集成在 **Android Studio** 等IDE中，IDE 可以对命中规则的代码进行UI提示。
+**Whisper** 是一套针对注解的代码检阅规则，作用于Android静态代码扫描，可以给开发人员在编写代码时提供代码提示和修改建议。**Whisper** 基于 [**Lint**][2] 开发，**Lint** 天然集成在 **Android Studio** 等IDE中，IDE 可以对命中规则的代码进行UI提示。
 
 **Whisper** 具有多种注解，每种注解有不同的提示作用——
 
@@ -27,8 +27,10 @@
 
 ## @Hide
 Java语言没有友元函数的概念。“包级私有”的可见性，调用方可以通过改包名来实现访问目的，Kotlin语言更是允许包名和文件路径不一致。Kotlin的“模块级(internal)”的可见性也有利有弊。
+
 `@Hide` 注解的目的是为了表达友元的概念，防止个别方法破坏类的封装性。
 比如常见地我们希望实现一个仅用于单元测试的方法，该方法会直接hook住关键的业务逻辑。`@org.jetbrains.annotations.TestOnly` 注解不会影响该方法的可见性，其他开发者可调用该方法而导致错误。
+
 `@Hide` 注解参数可以指定其他类的全限定符或者简单类名。只有满足参数指定的类，才可以访问注解的方法。
 
 ![Hide][5]
@@ -41,6 +43,7 @@ Java语言没有友元函数的概念。“包级私有”的可见性，调用�
 ![DeprecatedBy][6]
 
 当Kotlin语言在 `@kotlin.Deprecated` 注解中新增了 `replaceWith` 字段的时候，我就以为会做快捷替换的功能，结果没有。因此才添加了这个注解。
+
 通常新增方法，都是在废弃的方法上增删可选的参数，或者调整参数的顺序防止与旧方法的签名一致。因此 `@DeprecatedBy` 注解具有两种方法替换的特性：
 
 - 调整原方法的参数
@@ -75,6 +78,7 @@ Java语言没有友元函数的概念。“包级私有”的可见性，调用�
     
 ## @Immutable
 Java 缺少不可变集合的概念，导致对外暴露的集合往往需要拷贝一次，或者用 `Collections.unmodifiableCollection` 方法封装一次。
+
 `@Immutable` 注解的目的是添加不可变集合的语义，使得被注解的 `List` / `Queue` / `Map` / `Map.Entry` / `Collection` / `Iterator` 无法被修改。
 
 ![Immutable][7]
