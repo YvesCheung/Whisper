@@ -2,9 +2,21 @@ package com.yy.mobile.whisperlint.support.api6
 
 import com.android.SdkConstants
 import com.android.tools.lint.detector.api.CURRENT_API
+import com.android.tools.lint.detector.api.ConstantEvaluator
 import com.android.tools.lint.detector.api.JavaContext
+import com.intellij.psi.PsiLocalVariable
+import com.intellij.psi.PsiModifier
+import com.intellij.psi.PsiParameter
+import com.intellij.psi.PsiVariable
 import org.jetbrains.uast.UAnnotation
+import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
+import org.jetbrains.uast.ULiteralExpression
+import org.jetbrains.uast.UUnaryExpression
+import org.jetbrains.uast.UVariable
+import org.jetbrains.uast.UastPrefixOperator
+import org.jetbrains.uast.getContainingUMethod
+import org.jetbrains.uast.getUastContext
 
 /**
  * compat android gradle plugin < 3.6+
@@ -16,6 +28,51 @@ import org.jetbrains.uast.UExpression
  * 2019-12-20
  */
 object AnnotationCompat {
+
+    @JvmStatic
+    fun findLastAssignment(
+        variable: PsiVariable,
+        call: UElement
+    ): UExpression? {
+        var currVariable = variable
+        var lastAssignment: UElement? = null
+
+        if (currVariable is UVariable) {
+            currVariable = currVariable.psi
+        }
+
+        if (!currVariable.hasModifierProperty(PsiModifier.FINAL) && (currVariable is PsiLocalVariable || currVariable is PsiParameter)) {
+            val containingFunction = call.getContainingUMethod()
+            if (containingFunction != null) {
+                val context = call.getUastContext()
+                val finder = ConstantEvaluator.LastAssignmentFinder(
+                    currVariable, call, context, null, -1)
+                containingFunction.accept(finder)
+                lastAssignment = finder.lastAssignment
+            }
+        } else {
+            val context = call.getUastContext()
+            lastAssignment = context.getInitializerBody(currVariable)
+        }
+
+        return if (lastAssignment is UExpression) lastAssignment
+        else null
+    }
+
+    @JvmStatic
+    fun isMinusOne(argument: UElement): Boolean {
+        return if (argument is UUnaryExpression) {
+            val operand = argument.operand
+            if (operand is ULiteralExpression && argument.operator === UastPrefixOperator.UNARY_MINUS) {
+                val value = operand.value
+                value is Number && value.toInt() == 1
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
 
     @JvmStatic
     fun getAnnotationValue(annotation: UAnnotation): UExpression? {
@@ -91,6 +148,15 @@ object AnnotationCompat {
     }
 
     @JvmStatic
+    fun getAnnotationLongValues(
+        annotation: UAnnotation?,
+        name: String
+    ): Array<Long>? {
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
+            .getAnnotationLongValues(annotation, name)
+    }
+
+    @JvmStatic
     fun getAnnotationDoubleValue(
         annotation: UAnnotation?,
         name: String
@@ -125,5 +191,14 @@ object AnnotationCompat {
     ): Array<String>? {
         return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
             .getAnnotationStringValues(annotation, name)
+    }
+
+    @JvmStatic
+    fun getAnnotationIntValues(
+        annotation: UAnnotation?,
+        name: String
+    ): Array<Int>? {
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
+            .getAnnotationIntValues(annotation, name)
     }
 }

@@ -645,7 +645,7 @@ class WhisperHideTest {
             kotlin("""
                 package aa.cc
                 import aa.bb.TheClassShouldBeHide
-                
+
                 public class Friend {
 
                     init {
