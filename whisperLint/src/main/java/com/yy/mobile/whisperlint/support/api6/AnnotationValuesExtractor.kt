@@ -13,7 +13,6 @@ import org.jetbrains.uast.UAnnotation
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.toUElement
 import org.jetbrains.uast.util.isArrayInitializer
-import java.util.*
 
 /**
  * copy from [com.android.tools.lint.detector.api.AnnotationValuesExtractor].
@@ -48,32 +47,40 @@ internal sealed class AnnotationValuesExtractor {
     internal fun getAnnotationIntValue(annotation: UAnnotation?, name: String): Int? =
         (getAnnotationConstantObject(annotation, name) as? Number)?.toInt()
 
-    internal abstract fun getAnnotationStringValues(annotation: UAnnotation?, name: String): Array<String>?
+    internal fun getAnnotationStringValues(annotation: UAnnotation?, name: String): Array<String>? =
+        getAnnotationValuesInner(annotation, name)
 
-    internal abstract fun getAnnotationIntValues(annotation: UAnnotation?, name: String): Array<Int>?
+    internal fun getAnnotationIntValues(annotation: UAnnotation?, name: String): Array<Int>? =
+        getAnnotationValuesInner(annotation, name)
 
-    internal abstract fun getAnnotationLongValues(annotation: UAnnotation?, name: String): Array<Long>?
+    internal fun getAnnotationLongValues(annotation: UAnnotation?, name: String): Array<Long>? =
+        getAnnotationValuesInner(annotation, name)
+
+    private inline fun <reified DATA> getAnnotationValuesInner(
+        annotation: UAnnotation?,
+        name: String
+    ): Array<DATA>? {
+        return getAnnotationValues(DATA::class.java, annotation, name)
+            ?.toTypedArray()
+            ?.takeIf { it.isNotEmpty() }
+    }
+
+    internal abstract fun <DATA> getAnnotationValues(
+        cls: Class<DATA>,
+        annotation: UAnnotation?,
+        name: String
+    ): Collection<DATA>?
 
     private object Source : AnnotationValuesExtractor() {
+
         override fun getAnnotationConstantObject(annotation: UAnnotation?, name: String): Any? =
             annotation?.findDeclaredAttributeValue(name)?.let { ConstantEvaluator.evaluate(null, it) }
 
-        override fun getAnnotationStringValues(annotation: UAnnotation?, name: String): Array<String>? {
-            return getAnnotationValues(annotation, name)
-        }
-
-        override fun getAnnotationIntValues(annotation: UAnnotation?, name: String): Array<Int>? {
-            return getAnnotationValues(annotation, name)
-        }
-
-        override fun getAnnotationLongValues(annotation: UAnnotation?, name: String): Array<Long>? {
-            return getAnnotationValues(annotation, name)
-        }
-
-        private inline fun <reified DATA> getAnnotationValues(
+        override fun <DATA> getAnnotationValues(
+            cls: Class<DATA>,
             annotation: UAnnotation?,
             name: String
-        ): Array<DATA>? {
+        ): Collection<DATA>? {
             val psiAnnotation = annotation?.javaPsi ?: return null
 
             //fix KotlinUastLanguagePlugin bug.
@@ -94,8 +101,7 @@ internal sealed class AnnotationValuesExtractor {
                     .map {
                         constantEvaluator.evaluate(it.getArgumentExpression().toUElement())
                     }
-                    .filterIsInstance(DATA::class.java)
-                    .toTypedArray()
+                    .filterIsInstance(cls)
 
             } else {
                 var attributeValue = annotation.findDeclaredAttributeValue(name)
@@ -112,24 +118,19 @@ internal sealed class AnnotationValuesExtractor {
                     val initializer = (attributeValue as UCallExpression).valueArguments
 
                     val constantEvaluator = ConstantEvaluator()
-                    val result = initializer.stream()
+                    return initializer
                         .map { e -> constantEvaluator.evaluate(e) }
-                        .filter { e -> e is DATA }
-                        .map { e -> e as DATA }
-                        .toArray<DATA> { size -> arrayOfNulls(size) }
+                        .filterIsInstance(cls)
 
-                    return result.takeIf { result.isNotEmpty() }?.let { it }
                 } else {
                     // Use constant evaluator since we want to resolve field references as well
                     return when (val o = ConstantEvaluator.evaluate(null, attributeValue)) {
-                        is DATA -> {
-                            arrayOf(o)
+                        cls.isInstance(o) -> {
+                            @Suppress("UNCHECKED_CAST")
+                            listOf(o) as List<DATA>
                         }
                         is Array<*> -> {
-                            Arrays.stream(o)
-                                .filter { e -> e is DATA }
-                                .map { e -> e as DATA }
-                                .toArray<DATA> { size -> arrayOfNulls(size) }
+                            o.filterIsInstance(cls)
                         }
                         else -> {
                             null
@@ -147,48 +148,31 @@ internal sealed class AnnotationValuesExtractor {
         override fun getAnnotationConstantObject(annotation: UAnnotation?, name: String): Any? =
             getClsAnnotation(annotation)?.findDeclaredAttributeValue(name)?.let { ConstantEvaluator.evaluate(null, it) }
 
-        override fun getAnnotationStringValues(annotation: UAnnotation?, name: String): Array<String>? {
-            return getAnnotationValues(annotation, name)
-        }
-
-        override fun getAnnotationIntValues(annotation: UAnnotation?, name: String): Array<Int>? {
-            return getAnnotationValues(annotation, name)
-        }
-
-        override fun getAnnotationLongValues(annotation: UAnnotation?, name: String): Array<Long>? {
-            return getAnnotationValues(annotation, name)
-        }
-
-        private inline fun <reified DATA> getAnnotationValues(
+        override fun <DATA> getAnnotationValues(
+            cls: Class<DATA>,
             annotation: UAnnotation?,
             name: String
-        ): Array<DATA>? {
+        ): Collection<DATA>? {
             val clsAnnotation = getClsAnnotation(annotation)
                 ?: return null
             val attribute = clsAnnotation.findDeclaredAttributeValue(name) ?: return null
 
             if (attribute is PsiArrayInitializerMemberValue) {
-                val initializers = attribute.initializers
+                val initializer = attribute.initializers
                 val constantEvaluator = ConstantEvaluator()
 
-                val result = Arrays.stream(initializers)
+                return initializer
                     .map { e -> constantEvaluator.evaluate(e) }
-                    .filter { e -> e is DATA }
-                    .map { e -> e as DATA }
-                    .toArray<DATA> { size -> arrayOfNulls(size) }
-
-                return result.takeIf { it.isNotEmpty() }?.let { it }
+                    .filterIsInstance(cls)
             } else {
                 // Use constant evaluator since we want to resolve field references as well
                 return when (val o = ConstantEvaluator.evaluate(null, attribute)) {
-                    is DATA -> {
-                        arrayOf(o)
+                    cls.isInstance(o) -> {
+                        @Suppress("UNCHECKED_CAST")
+                        listOf(o) as List<DATA>
                     }
                     is Array<*> -> {
-                        Arrays.stream(o)
-                            .filter { e -> e is DATA }
-                            .map { e -> e as DATA }
-                            .toArray<DATA> { size -> arrayOfNulls(size) }
+                        o.filterIsInstance(cls)
                     }
                     else -> {
                         null

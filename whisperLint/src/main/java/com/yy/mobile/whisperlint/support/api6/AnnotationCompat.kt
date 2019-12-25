@@ -201,4 +201,13 @@ object AnnotationCompat {
         return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
             .getAnnotationIntValues(annotation, name)
     }
+
+    @JvmStatic
+    fun getAnnotationValues(
+        annotation: UAnnotation?,
+        name: String
+    ): Collection<Any>? {
+        return AnnotationValuesExtractor.getAnnotationValuesExtractor(annotation)
+            .getAnnotationValues(Any::class.java, annotation, name)
+    }
 }

@@ -9,7 +9,10 @@ import com.yy.mobile.whisper.StringDef
  */
 class ClassTest {
 
-    fun checkInt(@IntDef(1, 3) param: Int) {}
+    fun checkInt(@IntDef(1, 3, 4) param: Int) {}
+
+    @IntDef(1, 3)
+    private fun mustBe1Or3(): Int = 1
 
     fun checkString(@StringDef("hello", "world") param: String) {}
 
@@ -19,7 +22,7 @@ class ClassTest {
         fun main(vararg args: String) {
             val instance = ClassTest()
 
-            instance.checkInt(4)
+            instance.checkInt(instance.mustBe1Or3())
 
             instance.checkInt(1)
 

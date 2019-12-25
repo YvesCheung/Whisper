@@ -11,7 +11,6 @@ import com.android.tools.lint.detector.api.Scope
 import com.android.tools.lint.detector.api.Severity
 import com.intellij.psi.PsiArrayType
 import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiField
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiModifier
 import com.intellij.psi.PsiType
@@ -44,20 +43,8 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
 
     companion object {
 
-        val ISSUE_WHISPER_INT_DEFINE: Issue = Issue.create(
-            "WhisperIntDef",
-            "Incorrect constant",
-            "Ensures that when parameter in a method only allows a specific set of constants",
-            Category.USABILITY,
-            1,
-            Severity.ERROR,
-            Implementation(
-                WhisperConstDefDetector::class.java,
-                EnumSet.of(Scope.JAVA_FILE)
-            ))
-
-        val ISSUE_WHISPER_STRING_DEFINE: Issue = Issue.create(
-            "WhisperStringDef",
+        val ISSUE_WHISPER_CONST_DEFINE: Issue = Issue.create(
+            "WhisperConstDef",
             "Incorrect constant",
             "Ensures that when parameter in a method only allows a specific set of constants",
             Category.USABILITY,
@@ -72,9 +59,7 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
         private const val longAnnotation = "$AnnotationPkg.LongDef"
         private const val stringAnnotation = "$AnnotationPkg.StringDef"
 
-        fun getIssue() = arrayOf(
-            ISSUE_WHISPER_INT_DEFINE,
-            ISSUE_WHISPER_STRING_DEFINE)
+        fun getIssue() = arrayOf(ISSUE_WHISPER_CONST_DEFINE)
     }
 
     override fun applicableAnnotations() =
@@ -100,8 +85,8 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
         val allowValue =
             when (annotation.qualifiedName) {
                 intAnnotation -> AnnotationCompat.getAnnotationIntValues(annotation, ATTR_VALUE)
-                longAnnotation -> AnnotationCompat.getAnnotationStringValues(annotation, ATTR_VALUE)
-                stringAnnotation -> AnnotationCompat.getAnnotationLongValues(annotation, ATTR_VALUE)
+                longAnnotation -> AnnotationCompat.getAnnotationLongValues(annotation, ATTR_VALUE)
+                stringAnnotation -> AnnotationCompat.getAnnotationStringValues(annotation, ATTR_VALUE)
                 else -> null
             }
         val enumFlag =
@@ -110,7 +95,7 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                 else -> false
             }
         if (allowValue != null) {
-            checkTypeDefConstant(context, annotation, usage, null, enumFlag, allowValue)
+            checkTypeDefConstant(context, annotation, usage, usage, enumFlag, allowValue)
         }
     }
 
@@ -118,7 +103,7 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
         context: JavaContext,
         annotation: UAnnotation,
         usage: UElement,
-        errorNode: UElement?,
+        errorNode: UElement,
         flag: Boolean,
         allowValue: Array<out Any>
     ) {
@@ -127,22 +112,22 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                 null -> // Accepted for @StringDef
                     return
                 is String ->
-                    checkTypeDefConstant(
-                        context, annotation, usage, errorNode, false, value, allowValue)
+                    assertTypeDefConstant(
+                        context, usage, errorNode, value, allowValue)
                 is Number -> {
                     val v = value.toLong()
                     if (flag && v == 0L) {
                         // Accepted for a flag @IntDef
                         return
                     }
-                    checkTypeDefConstant(
-                        context, annotation, usage, errorNode, flag, value, allowValue)
+                    assertTypeDefConstant(
+                        context, usage, errorNode, value, allowValue)
                 }
             }
         } else if (AnnotationCompat.isMinusOne(usage)) {
             // -1 is accepted unconditionally for flags
             if (!flag) {
-                reportConstDef(context, annotation, usage, errorNode, allowValue)
+                report(context, usage, errorNode, allowValue)
             }
         } else if (usage is UPrefixExpression) {
             if (flag) {
@@ -161,7 +146,7 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
             }
         } else if (usage is UParenthesizedExpression) {
             val expression = usage.expression
-            checkTypeDefConstant(context, annotation, expression, errorNode, flag, allowValue)
+            checkTypeDefConstant(context, annotation, expression, expression, flag, allowValue)
         } else if (usage is UIfExpression) {
             // If it's ?: then check both the if and else clauses
             val thenExp = usage.thenExpression
@@ -210,8 +195,8 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                 if (resolved.type is PsiArrayType) {
                     // Allow checking the initializer here even if the field itself
                     // isn't final or static; check that the individual values are okay
-                    checkTypeDefConstant(
-                        context, annotation, usage, errorNode, flag, resolved, allowValue)
+                    assertTypeDefConstant(
+                        context, usage, errorNode, resolved, allowValue)
                     return
                 }
 
@@ -219,8 +204,8 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                 if (resolved.hasModifierProperty(PsiModifier.STATIC) &&
                     resolved.hasModifierProperty(PsiModifier.FINAL)
                 ) {
-                    checkTypeDefConstant(
-                        context, annotation, usage, errorNode, flag, resolved, allowValue)
+                    assertTypeDefConstant(
+                        context, usage, errorNode, resolved, allowValue)
                 } else {
                     val lastAssignment = AnnotationCompat.findLastAssignment(resolved, usage)
 
@@ -229,6 +214,9 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                             context, annotation, lastAssignment, errorNode, flag, allowValue)
                     }
                 }
+            } else if (resolved is PsiMethod) {
+                checkTypeDefConstantForMethodReturn(
+                    context, annotation, usage, errorNode, flag, allowValue)
             }
         } else if (usage is UCallExpression) {
             if (usage.isNewArrayWithInitializer() || usage.isArrayInitializer()) {
@@ -243,91 +231,90 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                     }
                 }
             } else {
-                val resolved = usage.resolve()
-                if (resolved is PsiMethod) {
-                    checkTypeDefConstant(
-                        context, annotation, usage, errorNode, flag, resolved, allowValue)
-                }
+                checkTypeDefConstantForMethodReturn(
+                    context, annotation, usage, errorNode, flag, allowValue)
             }
         }
+    }
 
-        if (usage is UReferenceExpression || usage is UCallExpression) {
-            // See if we're passing in a variable which itself has been annotated with
-            // a typedef annotation; if so, make sure that the typedef constants are the
-            // same, or a subset of the allowed constants
-            val resolvedArgument: PsiElement? =
-                when (usage) {
-                    is UReferenceExpression -> usage.resolve()
-                    is UCallExpression -> usage.resolve()
-                    else -> null
+    private fun checkTypeDefConstantForMethodReturn(
+        context: JavaContext,
+        annotation: UAnnotation,
+        usage: UElement,
+        errorNode: UElement,
+        flag: Boolean,
+        allowValue: Array<out Any>
+    ) {
+        // See if we're passing in a variable which itself has been annotated with
+        // a typedef annotation; if so, make sure that the typedef constants are the
+        // same, or a subset of the allowed constants
+        val resolvedArgument: PsiElement? =
+            when (usage) {
+                is UReferenceExpression -> usage.resolve()
+                is UCallExpression -> usage.resolve()
+                else -> null
+            }
+        if (resolvedArgument is PsiMethod) {
+            val fqn = annotation.qualifiedName
+            if (fqn != null) {
+                val methodAnnotation = resolvedArgument.getAnnotation(fqn)
+                    ?.toUElement() as? UAnnotation
+                if (methodAnnotation != null) {
+                    val subSet =
+                        AnnotationCompat.getAnnotationValues(methodAnnotation, ATTR_VALUE)
+                    if (subSet != null && subSet.all { it in allowValue }) {
+                        return
+                    }
                 }
-            if (resolvedArgument is PsiMethod) {
-                // Called some random method which has not been annotated.
-                // Let's peek inside to see if we can figure out more about it; if not,
-                // we don't want to flag it since it could get noisy with false
-                // positives.
-                val uMethod = resolvedArgument.toUElement()
-                if (uMethod is UMethod) {
-                    val body = uMethod.uastBody
-                    val retValue = if (body is UBlockExpression) {
-                        if (body.expressions.size == 1 && body.expressions[0] is UReturnExpression) {
-                            val ret = body.expressions[0] as UReturnExpression
-                            ret.returnExpression
-                        } else {
-                            null
-                        }
+            }
+            // Called some random method which has not been annotated.
+            // Let's peek inside to see if we can figure out more about it; if not,
+            // we don't want to flag it since it could get noisy with false
+            // positives.
+            val uMethod = resolvedArgument.toUElement()
+            if (uMethod is UMethod) {
+                val body = uMethod.uastBody
+                val retValue = if (body is UBlockExpression) {
+                    if (body.expressions.size == 1 && body.expressions[0] is UReturnExpression) {
+                        val ret = body.expressions[0] as UReturnExpression
+                        ret.returnExpression
                     } else {
-                        body
+                        null
                     }
-                    if (retValue is UReferenceExpression) {
-                        // Constant reference
-                        val const = retValue.resolve() ?: return
-                        if (const is PsiField) {
-                            checkTypeDefConstant(
-                                context, annotation, retValue, errorNode, flag, const, allowValue)
-                        }
-                        return
-                    } else if (retValue !is ULiteralExpression) {
-                        // Not a reference and not a constant literal: some more complicated
-                        // logic; don't try to flag this for fear of false positives
-                        return
-                    }
+                } else {
+                    body
+                }
+                if (retValue != null) {
+                    checkTypeDefConstant(
+                        context, annotation, retValue, errorNode, flag, allowValue)
                 }
             }
         }
     }
 
-    private fun checkTypeDefConstant(
+    private fun assertTypeDefConstant(
         context: JavaContext,
-        annotation: UAnnotation,
         usage: UElement,
-        errorNode: UElement?,
-        flag: Boolean,
+        errorNode: UElement,
         value: Any,
         allowValue: Array<out Any>
     ) {
         if (!allowValue.contains(value)) {
-            reportConstDef(context, annotation, usage, errorNode, allowValue)
+            report(context, usage, errorNode, allowValue)
         }
     }
 
-    private fun reportConstDef(
+    private fun report(
         context: JavaContext,
-        annotation: UAnnotation,
         usage: UElement,
-        errorNode: UElement?,
+        errorNode: UElement,
         allowValue: Array<out Any>
     ) {
-        val issue =
-            when (annotation.qualifiedName) {
-                intAnnotation -> ISSUE_WHISPER_INT_DEFINE
-                stringAnnotation -> ISSUE_WHISPER_STRING_DEFINE
-                else -> null
-            }
-        val locationNode = errorNode ?: usage
-        if (issue != null) {
-            context.report(issue, context.getLocation(locationNode),
-                "Must be one of ${Arrays.toString(allowValue)}")
+        val location = context.getLocation(errorNode)
+        if (usage != errorNode) {
+            location.withSecondary(context.getLocation(usage), "the actual value.")
         }
+        context.report(ISSUE_WHISPER_CONST_DEFINE, location,
+            "Must be one of ${Arrays.toString(allowValue)}")
     }
 }
