@@ -348,7 +348,15 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
         value: Any,
         allowValue: Array<out Any>
     ) {
-        if (!allowValue.contains(value)) {
+        val noEqualsIntValue = value is Int &&
+            allowValue.all { it !is Number || it.toInt() != value }
+
+        val noEqualsLongValue = value is Long &&
+            allowValue.all { it !is Number || it.toLong() != value }
+
+        val noEqualValue = value !is Number && !allowValue.contains(value)
+
+        if (noEqualsIntValue || noEqualsLongValue || noEqualValue) {
             report(context, annotation, usage, errorNode, allowValue, value)
         }
     }

@@ -49,20 +49,22 @@ internal sealed class AnnotationValuesExtractor {
     internal fun getAnnotationIntValue(annotation: UAnnotation?, name: String): Int? =
         (getAnnotationConstantObject(annotation, name) as? Number)?.toInt()
 
-    internal fun getAnnotationStringValues(annotation: UAnnotation?, name: String): Array<String>? =
-        getAnnotationValuesInner(annotation, name)
+    internal fun getAnnotationStringValues(annotation: UAnnotation?, name: String): Array<String>? {
+        return getAnnotationValues(String::class.java, annotation, name)
+            ?.toTypedArray()
+            ?.takeIf { it.isNotEmpty() }
+    }
 
-    internal fun getAnnotationIntValues(annotation: UAnnotation?, name: String): Array<Int>? =
-        getAnnotationValuesInner(annotation, name)
+    internal fun getAnnotationIntValues(annotation: UAnnotation?, name: String): Array<Int>? {
+        return getAnnotationValues(Number::class.java, annotation, name)
+            ?.map { it.toInt() }
+            ?.toTypedArray()
+            ?.takeIf { it.isNotEmpty() }
+    }
 
-    internal fun getAnnotationLongValues(annotation: UAnnotation?, name: String): Array<Long>? =
-        getAnnotationValuesInner(annotation, name)
-
-    private inline fun <reified DATA> getAnnotationValuesInner(
-        annotation: UAnnotation?,
-        name: String
-    ): Array<DATA>? {
-        return getAnnotationValues(DATA::class.java, annotation, name)
+    internal fun getAnnotationLongValues(annotation: UAnnotation?, name: String): Array<Long>? {
+        return getAnnotationValues(Number::class.java, annotation, name)
+            ?.map { it.toLong() }
             ?.toTypedArray()
             ?.takeIf { it.isNotEmpty() }
     }

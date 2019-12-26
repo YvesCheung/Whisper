@@ -38,6 +38,19 @@ class WhisperConstDefTest {
             annotation class StringDef(vararg val value: String)
     """.trimIndent())
 
+    private val longAnnotation: TestFile = kotlin("""
+            package com.yy.mobile.whisper
+
+            @MustBeDocumented
+            @Retention(AnnotationRetention.SOURCE)
+            @Target(
+                AnnotationTarget.FUNCTION,
+                AnnotationTarget.VALUE_PARAMETER,
+                AnnotationTarget.FIELD,
+                AnnotationTarget.LOCAL_VARIABLE)
+            annotation class LongDef(vararg val value: Long)
+    """.trimIndent())
+
     @Test
     fun `Check intDef in Kotlin function param with named 'value'`() {
         lint().files(
@@ -340,11 +353,14 @@ class WhisperConstDefTest {
             """.trimIndent()))
             .detector(WhisperConstDefDetector())
             .run()
-            .expect("src/aa/A.kt:21: Error: Must be one of [4, 5, 10, 12], but actual [13] [WhisperConstDef]\n" +
+            .expect("src/aa/A.kt:16: Error: Must be one of [4, 5], but actual [6] [WhisperConstDef]\n" +
+                "        return 6\n" +
+                "               ~\n" +
+                "src/aa/A.kt:21: Error: Must be one of [4, 5, 10, 12], but actual [13] [WhisperConstDef]\n" +
                 "    private fun return13(): Int = 13\n" +
                 "                                  ~~\n" +
                 "    src/aa/A.kt:11: Here's the @com.yy.mobile.whisper.IntDef value.\n" +
-                "1 errors, 0 warnings")
+                "2 errors, 0 warnings")
     }
 
     @Test
@@ -523,5 +539,37 @@ class WhisperConstDefTest {
                 "        checkString(\"Hello \")\n" +
                 "                     ~~~~~~\n" +
                 "1 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check longDef in Kotlin function param`() {
+        lint().files(
+            longAnnotation,
+            kotlin("""
+                package aa
+                import com.yy.mobile.whisper.LongDef
+                
+                class A {
+                
+                    companion object {
+                        const val HELLO = 1L
+                    }
+                
+                    fun checkLong(@LongDef(HELLO, 2) vararg param: Long) {}
+                
+                    fun main(args: String) {
+                        checkLong(1,2,3,4)
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperConstDefDetector())
+            .run()
+            .expect("src/aa/A.kt:13: Error: Must be one of [1, 2], but actual [3] [WhisperConstDef]\n" +
+                "        checkLong(1,2,3,4)\n" +
+                "                      ~\n" +
+                "src/aa/A.kt:13: Error: Must be one of [1, 2], but actual [4] [WhisperConstDef]\n" +
+                "        checkLong(1,2,3,4)\n" +
+                "                        ~\n" +
+                "2 errors, 0 warnings")
     }
 }
