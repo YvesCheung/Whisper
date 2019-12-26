@@ -77,6 +77,7 @@ Java语言没有友元函数的概念。“包级私有”的可见性，调用�
     `receiver = "deprecate.demo.ClassInstead"` 表示新方法是单例 `ClassInstead` 的静态方法，旧方法 `instance.oldMethod2(0)` 会被一键替换成 `ClassInstead.newMethod(0)`。
     
 ## @Immutable
+
 Java 缺少不可变集合的概念，导致对外暴露的集合往往需要拷贝一次，或者用 `Collections.unmodifiableCollection` 方法封装一次。
 
 `@Immutable` 注解的目的是添加不可变集合的语义，使得被注解的 `List` / `Queue` / `Map` / `Map.Entry` / `Collection` / `Iterator` 无法被修改。
@@ -84,6 +85,16 @@ Java 缺少不可变集合的概念，导致对外暴露的集合往往需要拷
 ![Immutable][7]
 
 Kotlin 中由于已经有不可变集合的概念，所以不需要这个注解。
+
+## @IntDef
+
+`@IntDef` 与 `@android.support.annotation.IntDef` 作用非常相似。区别是 `@IntDef` 并不作用于注解，而是直接作用于方法或方法参数。
+
+注解的参数或方法返回值，必须为注解参数指定的枚举值，或者指定枚举值的多元表达式（比如掩码的或运算）。
+
+![IntDef][8]
+
+同理还有 `@LongDef` 和 `@StringDef` 注解。
 
 # 安装
 1. 根目录 `build.gradle` 配置仓库
@@ -106,8 +117,11 @@ Kotlin 中由于已经有不可变集合的概念，所以不需要这个注解�
 	```
 	
     其中 *$VERSION* 为 [![](https://jitpack.io/v/YvesCheung/Whisper.svg)](https://jitpack.io/#YvesCheung/Whisper)
-    
-    
+
+
+
+> 若您还有其他想法，欢迎提交 [Issue][9] 或 [Pull Request][10]
+
 
   [1]: https://raw.githubusercontent.com/YvesCheung/Whisper/master/art/hello-whisper.jpg
   [2]: https://developer.android.com/studio/write/lint?hl=zh-CN
@@ -116,3 +130,6 @@ Kotlin 中由于已经有不可变集合的概念，所以不需要这个注解�
   [5]: https://raw.githubusercontent.com/YvesCheung/Whisper/master/art/@Hide.gif
   [6]: https://raw.githubusercontent.com/YvesCheung/Whisper/master/art/@DeprecateBy.gif
   [7]: https://raw.githubusercontent.com/YvesCheung/Whisper/master/art/@Immutable.gif
+  [8]: https://raw.githubusercontent.com/YvesCheung/Whisper/master/art/@IntDef.gif
+  [9]: https://github.com/YvesCheung/Whisper/issues
+  [10]: https://github.com/YvesCheung/Whisper/pulls
