@@ -1,6 +1,7 @@
 package intDef.demo
 
 import com.yy.mobile.whisper.IntDef
+import com.yy.mobile.whisper.LongDef
 import com.yy.mobile.whisper.StringDef
 
 /**
@@ -9,14 +10,11 @@ import com.yy.mobile.whisper.StringDef
  */
 class ClassTest {
 
-    fun checkInt(@IntDef(1, 3, 4) param: Int) {}
+    fun checkInt(@IntDef(1, 3, 4) vararg param: Int) {}
 
-    @IntDef(1, 3)
-    private fun mustBe1Or3(): Int = 2
+    fun checkString(@StringDef("hello", "world") vararg param: String) {}
 
-    fun checkIntArray(@IntDef(1, 3, 4) vararg param: Int) {}
-
-    fun checkString(@StringDef("hello", "world") param: String) {}
+    fun checkLong(@LongDef(4, 5) vararg param: Long) {}
 
     companion object {
 
@@ -24,15 +22,11 @@ class ClassTest {
         fun main(vararg args: String) {
             val instance = ClassTest()
 
-            instance.checkInt(instance.mustBe1Or3())
+            instance.checkInt(1, 3, 4, 5, 6)
 
-            instance.checkInt(1)
+            instance.checkString("hello", "hello world")
 
-            instance.checkIntArray(6, 3, 4, 5)
-
-            instance.checkString("hello world")
-
-            instance.checkString("hello")
+            instance.checkLong(1, 4, 5, 6)
         }
     }
 }
