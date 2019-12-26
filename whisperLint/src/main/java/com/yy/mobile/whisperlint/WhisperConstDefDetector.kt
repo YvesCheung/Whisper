@@ -29,8 +29,11 @@ import org.jetbrains.uast.UPolyadicExpression
 import org.jetbrains.uast.UPrefixExpression
 import org.jetbrains.uast.UReferenceExpression
 import org.jetbrains.uast.UReturnExpression
+import org.jetbrains.uast.USwitchExpression
 import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.UastBinaryOperator
+import org.jetbrains.uast.java.JavaUSwitchEntry
+import org.jetbrains.uast.kotlin.KotlinUSwitchEntry
 import org.jetbrains.uast.toUElement
 import org.jetbrains.uast.util.isArrayInitializer
 import org.jetbrains.uast.util.isNewArrayWithInitializer
@@ -68,7 +71,8 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
 
     override fun isApplicableAnnotationUsage(type: AnnotationUsageType): Boolean =
         type in AnnotationUsageTypeCompat.setOf(
-            AnnotationUsageTypeCompat.METHOD_CALL_PARAMETER)
+            AnnotationUsageTypeCompat.METHOD_CALL_PARAMETER,
+            AnnotationUsageTypeCompat.METHOD_RETURN)
 
     override fun visitAnnotationUsage(
         context: JavaContext,
@@ -159,6 +163,24 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
             if (elseExp != null) {
                 checkTypeDefConstant(
                     context, annotation, elseExp, errorNode, flag, allowValue)
+            }
+        } else if (usage is USwitchExpression) {
+            val switchBranch = usage.body.expressions
+            for (caseExp in switchBranch) {
+                val caseValue =
+                    when (caseExp) {
+                        is JavaUSwitchEntry -> {
+                            caseExp.body.expressions.lastOrNull { it.psi != null }
+                        }
+                        is KotlinUSwitchEntry -> {
+                            caseExp.body.expressions.lastOrNull { it.psi != null }
+                        }
+                        else -> null
+                    }
+                if (caseValue != null) {
+                    checkTypeDefConstant(
+                        context, annotation, caseValue, errorNode, flag, allowValue)
+                }
             }
         } else if (usage is UPolyadicExpression) {
             val calculateResult = usage.evaluate()

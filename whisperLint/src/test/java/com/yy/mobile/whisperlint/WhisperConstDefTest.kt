@@ -348,6 +348,72 @@ class WhisperConstDefTest {
     }
 
     @Test
+    fun `Check intDef in Kotlin function return value`() {
+        lint().files(
+            intAnnotation,
+            kotlin("""
+                package aa
+                import com.yy.mobile.whisper.IntDef
+                
+                class A {
+                
+                    @IntDef(1, 2, 3)
+                    fun return2(){
+                        val a = 2
+                        return a
+                    }
+                    
+                    @IntDef(1, 2, 3)
+                    fun return5(){
+                        val b = 5
+                        return b
+                    }
+                
+                    @IntDef(1, 2, 3)
+                    fun return1or3(){
+                        val a = 2
+                        return if(true) 1 else 3
+                    }
+                    
+                    @IntDef(1, 2, 3)
+                    fun return1or5(){
+                        val b = 1
+                        return if(true) b else 5
+                    }
+                    
+                    @IntDef(1, 2, 3)
+                    fun return1or3or5or7(){
+                        val a = 3
+                        return when(a) {
+                            1 -> 1
+                            3 -> 5
+                            else -> {
+                                val b = 5
+                                if(a == 3) 3 else 7
+                            }
+                        }
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperConstDefDetector())
+            .run()
+            .expect("src/aa/A.kt:14: Error: Must be one of [1, 2, 3], but actual [5] [WhisperConstDef]\n" +
+                "        val b = 5\n" +
+                "                ~\n" +
+                "    src/aa/A.kt:15: Here's the @com.yy.mobile.whisper.IntDef value.\n" +
+                "src/aa/A.kt:27: Error: Must be one of [1, 2, 3], but actual [5] [WhisperConstDef]\n" +
+                "        return if(true) b else 5\n" +
+                "                               ~\n" +
+                "src/aa/A.kt:35: Error: Must be one of [1, 2, 3], but actual [5] [WhisperConstDef]\n" +
+                "            3 -> 5\n" +
+                "                 ~\n" +
+                "src/aa/A.kt:38: Error: Must be one of [1, 2, 3], but actual [7] [WhisperConstDef]\n" +
+                "                if(a == 3) 3 else 7\n" +
+                "                                  ~\n" +
+                "4 errors, 0 warnings")
+    }
+
+    @Test
     fun `Check intDef in Java function param`() {
         lint().files(
             intAnnotation,
