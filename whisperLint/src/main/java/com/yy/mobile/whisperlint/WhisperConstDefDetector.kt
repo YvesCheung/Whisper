@@ -29,6 +29,7 @@ import org.jetbrains.uast.UPolyadicExpression
 import org.jetbrains.uast.UPrefixExpression
 import org.jetbrains.uast.UReferenceExpression
 import org.jetbrains.uast.UReturnExpression
+import org.jetbrains.uast.UVariable
 import org.jetbrains.uast.UastBinaryOperator
 import org.jetbrains.uast.toUElement
 import org.jetbrains.uast.util.isArrayInitializer
@@ -112,22 +113,22 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                 null -> // Accepted for @StringDef
                     return
                 is String ->
-                    assertTypeDefConstant(
-                        context, usage, errorNode, value, allowValue)
+                    assertIncludeValue(
+                        context, annotation, usage, errorNode, value, allowValue)
                 is Number -> {
                     val v = value.toLong()
                     if (flag && v == 0L) {
                         // Accepted for a flag @IntDef
                         return
                     }
-                    assertTypeDefConstant(
-                        context, usage, errorNode, value, allowValue)
+                    assertIncludeValue(
+                        context, annotation, usage, errorNode, value, allowValue)
                 }
             }
         } else if (AnnotationCompat.isMinusOne(usage)) {
             // -1 is accepted unconditionally for flags
             if (!flag) {
-                report(context, usage, errorNode, allowValue)
+                report(context, annotation, usage, errorNode, allowValue)
             }
         } else if (usage is UPrefixExpression) {
             if (flag) {
@@ -160,6 +161,12 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                     context, annotation, elseExp, errorNode, flag, allowValue)
             }
         } else if (usage is UPolyadicExpression) {
+            val calculateResult = usage.evaluate()
+            if (calculateResult != null) {
+                if (allowValue.contains(calculateResult)) {
+                    return
+                }
+            }
             if (flag) {
                 // Allow &'ing with masks
                 if (usage.operator === UastBinaryOperator.BITWISE_AND) {
@@ -175,7 +182,7 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
 
                 for (operand in usage.operands) {
                     checkTypeDefConstant(
-                        context, annotation, operand, errorNode, true, allowValue)
+                        context, annotation, operand, errorNode, flag, allowValue)
                 }
             } else {
 //                val operator = usage.operator
@@ -195,17 +202,22 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                 if (resolved.type is PsiArrayType) {
                     // Allow checking the initializer here even if the field itself
                     // isn't final or static; check that the individual values are okay
-                    assertTypeDefConstant(
-                        context, usage, errorNode, resolved, allowValue)
-                    return
+                    val exp = (resolved.toUElement() as UVariable).uastInitializer
+                    if (exp != null) {
+                        checkTypeDefConstant(context, annotation, exp, errorNode, flag, allowValue)
+                        return
+                    }
                 }
 
                 // If it's a constant (static/final) check that it's one of the allowed ones
                 if (resolved.hasModifierProperty(PsiModifier.STATIC) &&
                     resolved.hasModifierProperty(PsiModifier.FINAL)
                 ) {
-                    assertTypeDefConstant(
-                        context, usage, errorNode, resolved, allowValue)
+                    val constant = resolved.computeConstantValue()
+                    if (constant != null) {
+                        assertIncludeValue(
+                            context, annotation, usage, errorNode, constant, allowValue)
+                    }
                 } else {
                     val lastAssignment = AnnotationCompat.findLastAssignment(resolved, usage)
 
@@ -219,12 +231,26 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
                     context, annotation, usage, errorNode, flag, allowValue)
             }
         } else if (usage is UCallExpression) {
-            if (usage.isNewArrayWithInitializer() || usage.isArrayInitializer()) {
+
+            fun UCallExpression.isKotlinArrayFunction(): Boolean {
+                val name = this.methodName ?: return false
+                return name.contains("arrayOf") || name.contains("ArrayOf")
+            }
+
+            if (usage.isNewArrayWithInitializer() ||
+                usage.isArrayInitializer() ||
+                usage.isKotlinArrayFunction()) {
                 var type = usage.getExpressionType()
                 if (type != null) {
                     type = type.deepComponentType
                 }
-                if (PsiType.INT == type || PsiType.LONG == type) {
+
+                val anyPsi = context.psiFile ?: return
+                if (PsiType.INT == type ||
+                    PsiType.INT.getBoxedType(anyPsi) == type ||
+                    PsiType.LONG == type ||
+                    PsiType.LONG.getBoxedType(anyPsi) == type
+                ) {
                     for (expression in usage.valueArguments) {
                         checkTypeDefConstant(
                             context, annotation, expression, errorNode, flag, allowValue)
@@ -292,29 +318,52 @@ class WhisperConstDefDetector : Detector(), Detector.UastScanner {
         }
     }
 
-    private fun assertTypeDefConstant(
+    private fun assertIncludeValue(
         context: JavaContext,
+        annotation: UAnnotation,
         usage: UElement,
         errorNode: UElement,
         value: Any,
         allowValue: Array<out Any>
     ) {
         if (!allowValue.contains(value)) {
-            report(context, usage, errorNode, allowValue)
+            report(context, annotation, usage, errorNode, allowValue, value)
         }
     }
 
     private fun report(
         context: JavaContext,
+        annotation: UAnnotation,
         usage: UElement,
         errorNode: UElement,
-        allowValue: Array<out Any>
+        allowValue: Array<out Any>,
+        value: Any? = null
     ) {
-        val location = context.getLocation(errorNode)
-        if (usage != errorNode) {
-            location.withSecondary(context.getLocation(usage), "the actual value.")
+        infix fun UElement.isParentOf(element: UElement): Boolean {
+            var p: UElement? = element
+            while (p != null) {
+                if (p == this) {
+                    return true
+                }
+                p = p.uastParent
+            }
+            return false
         }
-        context.report(ISSUE_WHISPER_CONST_DEFINE, location,
-            "Must be one of ${Arrays.toString(allowValue)}")
+
+        val location =
+            if (errorNode isParentOf usage) {
+                context.getLocation(usage)
+            } else {
+                context.getLocation(usage)
+                    .withSecondary(
+                        context.getLocation(errorNode),
+                        "Here's the @${annotation.qualifiedName} value."
+                    )
+            }
+        var message = "Must be one of ${Arrays.toString(allowValue)}"
+        if (value != null) {
+            message += ", but actual [$value]"
+        }
+        context.report(ISSUE_WHISPER_CONST_DEFINE, usage, location, message)
     }
 }
