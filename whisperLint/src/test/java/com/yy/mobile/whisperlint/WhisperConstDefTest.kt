@@ -1,6 +1,7 @@
 package com.yy.mobile.whisperlint
 
 import com.android.tools.lint.checks.infrastructure.TestFile
+import com.android.tools.lint.checks.infrastructure.TestFiles.java
 import com.android.tools.lint.checks.infrastructure.TestFiles.kotlin
 import com.android.tools.lint.checks.infrastructure.TestLintTask.lint
 import org.junit.Test
@@ -347,6 +348,60 @@ class WhisperConstDefTest {
     }
 
     @Test
+    fun `Check intDef in Java function param`() {
+        lint().files(
+            intAnnotation,
+            java("""
+                package aa;
+                import com.yy.mobile.whisper.IntDef;
+                
+                public class A {
+                
+                    private void checkInt(@IntDef({1, 3, 5}) int param) {}
+                    
+                    private void checkInt2(@IntDef(value = {1, 3, 5}) int param) {}
+                    
+                    private void checkIntArray(@IntDef({1, 3, 5}) int... param) {}
+                    
+                    private void checkIntArray2(@IntDef(value = {1, 3, 5}) int... param) {}
+                
+                    void main(String[] args) {
+                        checkInt(3);
+                        checkInt(4);
+                        checkInt2(5);
+                        checkInt2(123121234);
+                        checkIntArray(5, 3, 1, 2);
+                        checkIntArray(1);
+                        checkIntArray2(5, 3, 1, 2);
+                        checkIntArray2(1);
+                        
+                        int reference = 6;
+                        checkInt(reference);
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperConstDefDetector())
+            .run()
+            .expect("src/aa/A.java:16: Error: Must be one of [1, 3, 5], but actual [4] [WhisperConstDef]\n" +
+                "        checkInt(4);\n" +
+                "                 ~\n" +
+                "src/aa/A.java:18: Error: Must be one of [1, 3, 5], but actual [123121234] [WhisperConstDef]\n" +
+                "        checkInt2(123121234);\n" +
+                "                  ~~~~~~~~~\n" +
+                "src/aa/A.java:19: Error: Must be one of [1, 3, 5], but actual [2] [WhisperConstDef]\n" +
+                "        checkIntArray(5, 3, 1, 2);\n" +
+                "                               ~\n" +
+                "src/aa/A.java:21: Error: Must be one of [1, 3, 5], but actual [2] [WhisperConstDef]\n" +
+                "        checkIntArray2(5, 3, 1, 2);\n" +
+                "                                ~\n" +
+                "src/aa/A.java:24: Error: Must be one of [1, 3, 5], but actual [6] [WhisperConstDef]\n" +
+                "        int reference = 6;\n" +
+                "                        ~\n" +
+                "    src/aa/A.java:25: Here's the @com.yy.mobile.whisper.IntDef value.\n" +
+                "5 errors, 0 warnings")
+    }
+
+    @Test
     fun `Check stringDef in Kotlin function param with named 'value'`() {
         lint().files(
             stringAnnotation,
@@ -369,6 +424,38 @@ class WhisperConstDefTest {
             .expect("src/aa/A.kt:10: Error: Must be one of [Hello, world], but actual [Hello world] [WhisperConstDef]\n" +
                 "        checkString(\"Hello world\")\n" +
                 "                     ~~~~~~~~~~~\n" +
+                "1 errors, 0 warnings")
+    }
+
+    @Test
+    fun `Check stringDef in Kotlin function param with const value`() {
+        lint().files(
+            stringAnnotation,
+            kotlin("""
+                package aa
+                import com.yy.mobile.whisper.StringDef
+                
+                class A {
+                
+                    companion object {
+                        const val HELLO = "Hello"
+                        const val WORLD = "World"
+                    }
+                
+                    fun checkString(@StringDef(HELLO, WORLD) param: String) {}
+                
+                    fun main(args: String) {
+                        checkString(HELLO)
+                        checkString("Hello")
+                        checkString("Hello ")
+                    }
+                }
+            """.trimIndent()))
+            .detector(WhisperConstDefDetector())
+            .run()
+            .expect("src/aa/A.kt:16: Error: Must be one of [Hello, World], but actual [Hello ] [WhisperConstDef]\n" +
+                "        checkString(\"Hello \")\n" +
+                "                     ~~~~~~\n" +
                 "1 errors, 0 warnings")
     }
 }
