@@ -3,9 +3,11 @@ package com.yy.mobile.whisperlint.support.api6
 import com.android.SdkConstants.ATTR_VALUE
 import com.android.tools.lint.detector.api.CURRENT_API
 import com.android.tools.lint.detector.api.ConstantEvaluator
+import com.intellij.psi.PsiAnnotation
 import com.intellij.psi.PsiArrayInitializerMemberValue
 import com.intellij.psi.impl.compiled.ClsAnnotationImpl
 import com.yy.mobile.whisperlint.support.VersionChecker
+import com.yy.mobile.whisperlint.support.api2.attributeNameCompat
 import org.jetbrains.kotlin.asJava.elements.KtLightPsiNameValuePair
 import org.jetbrains.kotlin.psi.KtValueArgument
 import org.jetbrains.kotlin.utils.addIfNotNull
@@ -81,15 +83,20 @@ internal sealed class AnnotationValuesExtractor {
             annotation: UAnnotation?,
             name: String
         ): Collection<DATA>? {
-            val psiAnnotation = annotation?.javaPsi ?: return null
 
             //fix KotlinUastLanguagePlugin bug.
             //Can't correctly convert @Annotation(literal,literal,literal) to UCallExpression
             val attrValue = mutableListOf<KtValueArgument>()
-            for (attr in psiAnnotation.attributes) {
+            val psiAnnotation =
+                if (VersionChecker.envVersion() <= 1) {
+                    annotation?.psi as? PsiAnnotation ?: return null
+                } else {
+                    annotation?.javaPsi ?: return null
+                }
+            for (attr in psiAnnotation.parameterList.attributes) {
                 @Suppress("SENSELESS_COMPARISON")
-                if ((attr.attributeName == null && name == ATTR_VALUE) ||
-                    attr.attributeName == name) {
+                if ((attr.attributeNameCompat == null && name == ATTR_VALUE) ||
+                    attr.attributeNameCompat == name) {
                     val ktArgument = (attr as? KtLightPsiNameValuePair)?.valueArgument
                     attrValue.addIfNotNull(ktArgument)
                 }
