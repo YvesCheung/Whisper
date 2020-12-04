@@ -4,6 +4,7 @@ import com.android.tools.lint.client.api.IssueRegistry
 import com.android.tools.lint.detector.api.CURRENT_API
 import com.android.tools.lint.detector.api.Issue
 
+@Suppress("UnstableApiUsage")
 class WhisperRuleRegistry : IssueRegistry() {
 
     override val issues: List<Issue>
@@ -13,7 +14,8 @@ class WhisperRuleRegistry : IssueRegistry() {
             *WhisperHideDetector.getIssue(),
             *WhisperUseWithDetector.getIssue(),
             *WhisperImmutableDetector.getIssue(),
-            *WhisperConstDefDetector.getIssue())
+            *WhisperConstDefDetector.getIssue(),
+            *WhisperRangeDetector.getIssue())
 
     override val api: Int = CURRENT_API
 
