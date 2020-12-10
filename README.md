@@ -1,5 +1,8 @@
 # Whisper
 
+[![Download](https://api.bintray.com/packages/yvescheung/maven/whisper/images/download.svg) ](https://bintray.com/yvescheung/maven/whisper/_latestVersion)
+[![](https://jitpack.io/v/YvesCheung/Whisper.svg)](https://jitpack.io/#YvesCheung/Whisper)
+
 > 一套基于Android Lint的代码检阅规则，用于对指定注解的代码进行提示和建议
 
 ![hello whisper][1]
@@ -97,26 +100,15 @@ Kotlin 中由于已经有不可变集合的概念，所以不需要这个注解�
 同理还有 `@LongDef` 和 `@StringDef` 注解。
 
 # 安装
-1. 根目录 `build.gradle` 配置仓库
 
-    ```groovy
-    allprojects {
-		repositories {
-			...
-			maven { url 'https://jitpack.io' }
-		}
-	}
-    ```
-    
-2. 使用注解的模块添加依赖 
-
-    ```groovy
-    dependencies {
-	    implementation 'com.github.YvesCheung:Whisper:$VERSION'
-	}
-	```
+```groovy
+dependencies {
+    implementation 'com.yy.mobile:whisper:$VERSION'
+}
+```
 	
-    其中 *$VERSION* 为 [![](https://jitpack.io/v/YvesCheung/Whisper.svg)](https://jitpack.io/#YvesCheung/Whisper)
+其中 *$VERSION* 为 [![Download](https://api.bintray.com/packages/yvescheung/maven/whisper/images/download.svg)](https://bintray.com/yvescheung/maven/whisper/_latestVersion)
+   
 
 
 
