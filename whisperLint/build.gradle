@@ -5,7 +5,7 @@ ext {
     bintrayRepo = 'maven'
     bintrayName = 'whisper-lint'
 
-    libraryGroupId = 'com.yy.mobile'
+    libraryGroupId = 'com.github.yvescheung'
     libraryName = 'whisper-lint'
 
     libraryDescription = '一套用于代码检阅的注解(Lint)'
@@ -33,7 +33,7 @@ dependencies {
 
 jar {
     manifest {
-        attributes("Lint-Registry": "com.yy.mobile.whisperlint.WhisperRuleRegistry")
+        attributes("Lint-Registry": "com.github.yvescheung.whisperlint.WhisperRuleRegistry")
     }
 }
 

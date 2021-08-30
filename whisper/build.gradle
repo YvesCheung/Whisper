@@ -5,7 +5,7 @@ ext {
     bintrayRepo = 'maven'
     bintrayName = 'whisper'
 
-    libraryGroupId = 'com.yy.mobile'
+    libraryGroupId = 'com.github.yvescheung'
     libraryName = 'whisper'
 
     libraryDescription = '一套用于代码检阅的注解'

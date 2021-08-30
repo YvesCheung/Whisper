@@ -103,7 +103,7 @@ Kotlin 中由于已经有不可变集合的概念，所以不需要这个注解�
 
 ```groovy
 dependencies {
-    implementation 'com.yy.mobile:whisper:$VERSION'
+    implementation 'com.github.yvescheung:whisper:$VERSION'
 }
 ```
 	

@@ -1,8 +1,8 @@
 package hint.demo;
 
-import com.yy.mobile.whisper.NeedError;
-import com.yy.mobile.whisper.NeedInfo;
-import com.yy.mobile.whisper.NeedWarning;
+import com.github.yvescheung.whisper.NeedError;
+import com.github.yvescheung.whisper.NeedInfo;
+import com.github.yvescheung.whisper.NeedWarning;
 
 /**
  * @author YvesCheung

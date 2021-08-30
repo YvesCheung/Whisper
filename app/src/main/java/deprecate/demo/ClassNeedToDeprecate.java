@@ -3,7 +3,7 @@ package deprecate.demo;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 
-import com.yy.mobile.whisper.DeprecatedBy;
+import com.github.yvescheung.whisper.DeprecatedBy;
 
 /**
  * @author YvesCheung

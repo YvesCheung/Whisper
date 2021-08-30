@@ -1,8 +1,8 @@
 package intDef.demo
 
-import com.yy.mobile.whisper.IntDef
-import com.yy.mobile.whisper.LongDef
-import com.yy.mobile.whisper.StringDef
+import com.github.yvescheung.whisper.IntDef
+import com.github.yvescheung.whisper.LongDef
+import com.github.yvescheung.whisper.StringDef
 
 /**
  * @author YvesCheung

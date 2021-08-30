@@ -1,7 +1,7 @@
 package hide.demo
 
 import android.util.Log
-import com.yy.mobile.whisper.Hide
+import com.github.yvescheung.whisper.Hide
 
 /**
  * @author YvesCheung

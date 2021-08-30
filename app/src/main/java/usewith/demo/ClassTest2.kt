@@ -1,6 +1,6 @@
 package usewith.demo
 
-import com.yy.mobile.whisper.UseWith
+import com.github.yvescheung.whisper.UseWith
 
 /**
  * @author YvesCheung

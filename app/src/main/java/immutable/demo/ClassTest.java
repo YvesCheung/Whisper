@@ -1,6 +1,6 @@
 package immutable.demo;
 
-import com.yy.mobile.whisper.Immutable;
+import com.github.yvescheung.whisper.Immutable;
 
 import java.util.ArrayList;
 import java.util.List;
